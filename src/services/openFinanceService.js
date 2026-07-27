@@ -187,6 +187,74 @@ export async function listOpenFinanceInvestmentTransactions(limit = 5000) {
   if (error) throw error
   return data ?? []
 }
+
+export async function listOpenFinanceLoans(limit = 1000) {
+  const { data, error } = await supabase
+    .from('open_finance_loans')
+    .select(`
+      *,
+      open_finance_connections (
+        id,
+        institution_name,
+        provider,
+        provider_item_id
+      )
+    `)
+    .eq('is_current', true)
+    .order('outstanding_balance', { ascending: false, nullsFirst: false })
+    .order('product_name')
+    .limit(limit)
+
+  if (error) throw error
+  return data ?? []
+}
+
+export async function listDebtCreditCardBills(limit = 1000) {
+  const { data, error } = await supabase
+    .from('credit_card_bills')
+    .select(`
+      *,
+      credit_cards (
+        id,
+        card_name,
+        brand,
+        last_four_digits,
+        currency,
+        open_finance_connections (
+          id,
+          institution_name,
+          provider_item_id
+        )
+      )
+    `)
+    .in('status', ['OPEN', 'CLOSED', 'PARTIAL', 'OVERDUE'])
+    .order('due_date', { ascending: true, nullsFirst: false })
+    .limit(limit)
+
+  if (error) throw error
+  return data ?? []
+}
+
+export async function listNegativeOpenFinanceAccounts(limit = 1000) {
+  const { data, error } = await supabase
+    .from('open_finance_accounts')
+    .select(`
+      *,
+      open_finance_connections (
+        id,
+        institution_name,
+        provider_item_id
+      )
+    `)
+    .lt('current_balance', 0)
+    .eq('status', 'ACTIVE')
+    .order('current_balance', { ascending: true })
+    .limit(limit)
+
+  if (error) throw error
+  return data ?? []
+}
+
 export async function createPluggyConnectToken() {
   const { data, error } =
     await supabase.functions.invoke(

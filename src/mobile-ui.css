@@ -1406,3 +1406,281 @@ textarea,
     text-align: left;
   }
 }
+
+/* =========================================================
+   ETAPA 10 - INVESTIMENTOS SEM CONTA E CENTRAL DE DIVIDAS
+   ========================================================= */
+.data-page .workspace-choice-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.debt-info-panel,
+.debt-info-copy,
+.debt-institution-header,
+.debt-month-header,
+.debt-contract-header,
+.debt-simple-list > article {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.debt-info-panel {
+  border-color: #bcd8c9;
+  background: linear-gradient(135deg, #f1faf6, #ffffff);
+}
+
+.debt-info-copy {
+  justify-content: flex-start;
+  min-width: 0;
+  color: #176545;
+}
+
+.debt-info-copy > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.debt-info-copy span {
+  color: #527264;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.debt-institution-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.debt-institution-card,
+.debt-month-card,
+.debt-contract-card {
+  min-width: 0;
+  padding: 17px;
+  border: 1px solid var(--ui-border);
+  border-radius: 16px;
+  background: linear-gradient(180deg, #ffffff, #f9fbfd);
+  box-shadow: var(--ui-shadow-sm);
+}
+
+.debt-institution-header {
+  align-items: flex-start;
+}
+
+.debt-institution-header > div,
+.debt-contract-header > div {
+  min-width: 0;
+}
+
+.debt-institution-header span,
+.debt-contract-header span,
+.debt-contract-header small {
+  color: var(--ui-muted);
+  font-size: 12px;
+}
+
+.debt-institution-header h3,
+.debt-contract-header h3 {
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+  font-size: 17px;
+}
+
+.debt-institution-total {
+  display: block;
+  margin: 18px 0;
+  color: #b33232;
+  font-size: 26px;
+  letter-spacing: -0.035em;
+}
+
+.debt-breakdown-grid,
+.debt-contract-values {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.debt-breakdown-grid > div,
+.debt-contract-values > div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border-radius: 11px;
+  background: #f2f6fa;
+}
+
+.debt-breakdown-grid span,
+.debt-contract-values span,
+.debt-month-lines span,
+.debt-simple-list span {
+  color: var(--ui-muted);
+  font-size: 11px;
+}
+
+.debt-breakdown-grid strong,
+.debt-contract-values strong {
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+.debt-month-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.debt-month-header {
+  padding-bottom: 11px;
+  border-bottom: 1px solid #e4ebf2;
+}
+
+.debt-month-header strong {
+  text-transform: capitalize;
+}
+
+.debt-month-header span {
+  color: #b33232;
+  font-weight: 850;
+}
+
+.debt-month-lines {
+  display: grid;
+  gap: 8px;
+  padding-top: 11px;
+}
+
+.debt-month-lines > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.debt-month-lines strong {
+  font-size: 12px;
+  text-align: right;
+}
+
+.debt-contract-list,
+.debt-simple-list {
+  display: grid;
+  gap: 12px;
+}
+
+.debt-contract-card {
+  padding: 18px;
+}
+
+.debt-contract-header {
+  align-items: flex-start;
+  margin-bottom: 15px;
+}
+
+.debt-simple-list > article {
+  min-width: 0;
+  padding: 13px 0;
+  border-bottom: 1px solid #e7edf4;
+}
+
+.debt-simple-list > article:last-child {
+  border-bottom: 0;
+}
+
+.debt-simple-list > article > div:first-child,
+.debt-list-value {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.debt-simple-list strong {
+  overflow-wrap: anywhere;
+}
+
+.debt-list-value {
+  flex: 0 0 auto;
+  text-align: right;
+}
+
+@media (max-width: 1100px) {
+  .data-page .workspace-choice-grid,
+  .debt-institution-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .debt-month-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .data-page .workspace-choice-grid,
+  .debt-institution-grid,
+  .debt-month-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .debt-info-panel,
+  .debt-info-copy,
+  .debt-contract-header,
+  .debt-simple-list > article {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .debt-info-panel .secondary-button {
+    width: 100%;
+  }
+
+  .debt-institution-card,
+  .debt-month-card,
+  .debt-contract-card {
+    padding: 14px;
+  }
+
+  .debt-institution-total {
+    margin: 14px 0;
+    font-size: 23px;
+  }
+
+  .debt-breakdown-grid,
+  .debt-contract-values {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .debt-list-value {
+    width: 100%;
+    text-align: left;
+  }
+}
+
+@media (max-width: 390px) {
+  .debt-breakdown-grid,
+  .debt-contract-values {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sync-notices {
+  margin-top: 14px;
+}
+
+.sync-notices ul {
+  margin: 8px 0 0;
+  padding-left: 20px;
+}
+
+.sync-notices li + li {
+  margin-top: 5px;
+}
+
+.info-callout-secondary {
+  margin-top: 10px;
+  color: #5b4a14;
+  border-color: #ead79d;
+  background: #fffaf0;
+}

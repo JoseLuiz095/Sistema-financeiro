@@ -175,7 +175,6 @@ export default function OpenFinancePage({ setFeedback, onChanged }) {
       <section className="panel">
         <div className="panel-header">
           <h2>Open Finance</h2>
-
           <p>
             Conecte uma instituição e atualize os dados manualmente quando necessário.
           </p>
@@ -183,6 +182,10 @@ export default function OpenFinancePage({ setFeedback, onChanged }) {
 
         <div className="info-callout">
           A leitura manual não movimenta dinheiro e não inicia pagamentos. As credenciais da Pluggy continuam protegidas nos Secrets da Edge Function.
+        </div>
+
+        <div className="info-callout info-callout-secondary">
+          No Meu Pluggy, cada banco conectado precisa ser autorizado separadamente no seu site. Ao adicionar o Inter, clique novamente em “Conectar instituição”, escolha Meu Pluggy e autorize a conexão do Inter.
         </div>
 
         <div className="inline-actions">
@@ -282,7 +285,18 @@ export default function OpenFinancePage({ setFeedback, onChanged }) {
             <article className="summary-card"><span>Faturas</span><strong>{lastResult.result?.bills ?? 0}</strong></article>
             <article className="summary-card"><span>Posições de investimento</span><strong>{lastResult.result?.investments ?? 0}</strong></article>
             <article className="summary-card"><span>Movimentos de investimento</span><strong>{lastResult.result?.investment_transactions ?? 0}</strong></article>
+            <article className="summary-card"><span>Empréstimos e créditos</span><strong>{lastResult.result?.loans ?? 0}</strong></article>
           </div>
+          {lastResult.notices?.length > 0 && (
+            <div className="feedback info sync-notices">
+              <strong>Avisos da sincronização</strong>
+              <ul>
+                {lastResult.notices.map((notice) => (
+                  <li key={notice}>{notice}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </section>
       )}
 
@@ -363,11 +377,11 @@ export default function OpenFinancePage({ setFeedback, onChanged }) {
         <div className="table-wrapper">
           <table>
             <thead>
-              <tr><th>Início</th><th>Instituição</th><th>Período</th><th>Status</th><th>Contas</th><th>Movimentos</th><th>Faturas</th><th>Investimentos</th><th>Erro</th></tr>
+              <tr><th>Início</th><th>Instituição</th><th>Período</th><th>Status</th><th>Contas</th><th>Movimentos</th><th>Faturas</th><th>Investimentos</th><th>Dívidas</th><th>Erro</th></tr>
             </thead>
             <tbody>
               {logs.length === 0 ? (
-                <tr><td colSpan="9" className="empty-cell">Nenhuma sincronização registrada.</td></tr>
+                <tr><td colSpan="10" className="empty-cell">Nenhuma sincronização registrada.</td></tr>
               ) : logs.map((log) => (
                 <tr key={log.id}>
                   <td>{formatDateTime(log.started_at)}</td>
@@ -378,6 +392,7 @@ export default function OpenFinancePage({ setFeedback, onChanged }) {
                   <td>{Number(log.bank_transactions || 0) + Number(log.card_transactions || 0)}</td>
                   <td>{log.bills}</td>
                   <td>{log.investments ?? 0}</td>
+                  <td>{log.loans ?? 0}</td>
                   <td>{log.error_message || '-'}</td>
                 </tr>
               ))}
