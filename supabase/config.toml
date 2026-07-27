@@ -1,0 +1,2 @@
+[functions.bank-webhook]
+verify_jwt = false
