@@ -5,6 +5,7 @@ import {
   listNegativeOpenFinanceAccounts,
   listOpenFinanceLoans,
 } from '../services/openFinanceService'
+import { getConnectionDisplayName } from '../utils/openFinance'
 import {
   formatCurrency,
   formatDate,
@@ -31,21 +32,26 @@ function monthDistance(fromKey, toKey) {
 }
 
 function getLoanInstitution(loan) {
-  return loan.institution_name
-    || loan.open_finance_connections?.institution_name
-    || 'Instituição não identificada'
+  const connectionName = getConnectionDisplayName(loan.open_finance_connections)
+  return connectionName !== 'Instituição não identificada'
+    ? connectionName
+    : loan.institution_name || 'Instituição não identificada'
 }
 
 function getBillInstitution(bill) {
-  return bill.credit_cards?.open_finance_connections?.institution_name
-    || bill.credit_cards?.card_name
-    || 'Instituição não identificada'
+  const connectionName = getConnectionDisplayName(
+    bill.credit_cards?.open_finance_connections,
+  )
+  return connectionName !== 'Instituição não identificada'
+    ? connectionName
+    : bill.credit_cards?.card_name || 'Instituição não identificada'
 }
 
 function getAccountInstitution(account) {
-  return account.open_finance_connections?.institution_name
-    || account.account_name
-    || 'Instituição não identificada'
+  const connectionName = getConnectionDisplayName(account.open_finance_connections)
+  return connectionName !== 'Instituição não identificada'
+    ? connectionName
+    : account.account_name || 'Instituição não identificada'
 }
 
 function getBillRemainingAmount(bill) {

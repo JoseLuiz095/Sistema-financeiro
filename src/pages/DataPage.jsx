@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import AppIcon from '../components/AppIcon'
 import ImportPage from './ImportPage'
 import OpenFinancePage from './OpenFinancePage'
-import DebtsPage from './DebtsPage'
 
 const OPTIONS = [
   {
@@ -20,14 +19,6 @@ const OPTIONS = [
     action: 'Abrir conexão',
     icon: 'bank',
     badge: 'Conexão segura',
-  },
-  {
-    value: 'debts',
-    title: 'Dívidas',
-    description: 'Veja empréstimos, faturas em aberto, saldos negativos e a projeção por mês.',
-    action: 'Abrir visão de dívidas',
-    icon: 'debt',
-    badge: 'Consolidado',
   },
 ]
 
@@ -75,18 +66,6 @@ export default function DataPage({
     )
   }
 
-  if (section === 'debts') {
-    return (
-      <div className="page-stack">
-        <button type="button" className="back-button action-button-with-icon" onClick={() => setSection('menu')}>
-          <span aria-hidden="true">←</span>
-          Voltar para dados
-        </button>
-        <DebtsPage setFeedback={setFeedback} />
-      </div>
-    )
-  }
-
   return (
     <div className="page-stack data-page">
       <section className="section-intro section-intro-card">
@@ -97,8 +76,8 @@ export default function DataPage({
           <span className="eyebrow">Entrada de dados</span>
           <h2>Como deseja atualizar o sistema?</h2>
           <p>
-            Escolha a forma mais prática. Você pode importar um extrato, conectar uma instituição ou acompanhar suas
-            dívidas sem ativar sincronizações automáticas.
+            Importe um extrato ou conecte uma instituição. A análise de crédito e dívidas
+            agora está agrupada na Central de análises.
           </p>
         </div>
       </section>

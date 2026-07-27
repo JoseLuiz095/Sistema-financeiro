@@ -1,5 +1,4 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
-import { PluggyConnect } from 'react-pluggy-connect'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -532,6 +531,45 @@ async function pluggyGet(
   return responseBody
 }
 
+async function listPluggyAccounts(
+  itemId: string,
+  apiKey: string,
+) {
+  const url =
+    `https://api.pluggy.ai/accounts?itemId=${encodeURIComponent(itemId)}`
+
+  const response = await fetch(url, {
+    headers: {
+      Accept: 'application/json',
+      'X-API-KEY': apiKey,
+    },
+  })
+
+  const responseBody =
+    await response.json().catch(() => null)
+
+  // Itens exclusivos de investimentos podem não expor ACCOUNTS.
+  if ([400, 404, 422].includes(response.status)) {
+    return []
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      `Erro ao consultar contas na Pluggy ${response.status}: ${
+        responseBody?.message ?? response.statusText
+      }`,
+    )
+  }
+
+  if (Array.isArray(responseBody?.results)) {
+    return responseBody.results
+  }
+
+  return Array.isArray(responseBody)
+    ? responseBody
+    : []
+}
+
 async function listPluggyTransactions(
   accountId: string,
   apiKey: string,
@@ -661,6 +699,111 @@ function nullableNumber(value: unknown) {
   return Number.isFinite(parsed) ? parsed : null
 }
 
+function firstFiniteNumber(...values: unknown[]) {
+  for (const value of values) {
+    const parsed = nullableNumber(value)
+    if (parsed !== null) return parsed
+  }
+  return null
+}
+
+function firstNonZeroNumber(...values: unknown[]) {
+  for (const value of values) {
+    const parsed = nullableNumber(value)
+    if (parsed !== null && parsed !== 0) return parsed
+  }
+  return null
+}
+
+function getInvestmentNumericSnapshot(investment: any) {
+  const unitValue = firstFiniteNumber(
+    investment?.value,
+    investment?.unitValue,
+    investment?.quoteValue,
+    investment?.currentUnitValue,
+  )
+
+  const quantity = firstFiniteNumber(
+    investment?.quantity,
+    investment?.currentQuantity,
+  )
+
+  const calculatedGross =
+    unitValue !== null && quantity !== null
+      ? unitValue * quantity
+      : null
+
+  const grossAmount = firstNonZeroNumber(
+    investment?.amount,
+    investment?.grossAmount,
+    calculatedGross,
+    investment?.balance,
+  ) ?? firstFiniteNumber(
+    investment?.amount,
+    investment?.grossAmount,
+    calculatedGross,
+    investment?.balance,
+  )
+
+  const explicitBalance = firstFiniteNumber(
+    investment?.balance,
+    investment?.netBalance,
+    investment?.currentBalance,
+  )
+
+  const withdrawalAmount = firstFiniteNumber(
+    investment?.amountWithdrawal,
+    investment?.withdrawalAmount,
+    investment?.availableAmount,
+  )
+
+  const status = String(investment?.status ?? '').toUpperCase()
+  const shouldUseBalanceFallback =
+    explicitBalance === null ||
+    (
+      explicitBalance === 0 &&
+      status !== 'TOTAL_WITHDRAWAL' &&
+      firstNonZeroNumber(withdrawalAmount, grossAmount) !== null
+    )
+
+  const netBalance = shouldUseBalanceFallback
+    ? firstNonZeroNumber(withdrawalAmount, grossAmount) ?? explicitBalance ?? 0
+    : explicitBalance
+
+  const explicitProfit = firstFiniteNumber(
+    investment?.amountProfit,
+    investment?.profitAmount,
+  )
+
+  const explicitOriginal = firstFiniteNumber(
+    investment?.amountOriginal,
+    investment?.originalAmount,
+    investment?.principalAmount,
+  )
+
+  const originalAmount = explicitOriginal ?? (
+    explicitProfit !== null && netBalance !== null
+      ? netBalance - explicitProfit
+      : grossAmount
+  )
+
+  const profitAmount = explicitProfit ?? (
+    originalAmount !== null && netBalance !== null
+      ? netBalance - originalAmount
+      : null
+  )
+
+  return {
+    unitValue,
+    quantity,
+    grossAmount,
+    netBalance,
+    originalAmount,
+    profitAmount,
+    withdrawalAmount,
+  }
+}
+
 function normalizeInvestmentTransactionType(value: unknown) {
   const allowed = [
     'BUY',
@@ -743,9 +886,13 @@ async function listPluggyInvestments(
 
     const results = Array.isArray(responseBody?.results)
       ? responseBody.results
-      : Array.isArray(responseBody)
-        ? responseBody
-        : []
+      : Array.isArray(responseBody?.data)
+        ? responseBody.data
+        : Array.isArray(responseBody?.investments)
+          ? responseBody.investments
+          : Array.isArray(responseBody)
+            ? responseBody
+            : []
 
     investments.push(...results)
 
@@ -830,6 +977,70 @@ async function listPluggyInvestmentTransactions(
   }
 
   return transactions
+}
+
+function inferLoanStatus(loan: any) {
+  const outstandingBalance = nullableNumber(
+    loan?.payments?.contractOutstandingBalance,
+  )
+
+  const pastDueInstallments = Number(
+    loan?.installments?.pastDueInstallments ??
+      loan?.installments?.pastDueInstalments ??
+      0,
+  )
+
+  if (
+    loan?.settlementDate ||
+    (outstandingBalance !== null && outstandingBalance <= 0)
+  ) {
+    return 'SETTLED'
+  }
+
+  if (pastDueInstallments > 0) {
+    return 'OVERDUE'
+  }
+
+  return 'ACTIVE'
+}
+
+async function listPluggyLoans(
+  itemId: string,
+  apiKey: string,
+) {
+  const url =
+    `https://api.pluggy.ai/loans?itemId=${encodeURIComponent(itemId)}`
+
+  const response = await fetch(url, {
+    headers: {
+      Accept: 'application/json',
+      'X-API-KEY': apiKey,
+    },
+  })
+
+  const responseBody =
+    await response.json().catch(() => null)
+
+  // LOANS é opcional e varia conforme a instituição/conector.
+  if ([400, 404, 422].includes(response.status)) {
+    return []
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      `Erro ao consultar empréstimos na Pluggy ${response.status}: ${
+        responseBody?.message ?? response.statusText
+      }`,
+    )
+  }
+
+  if (Array.isArray(responseBody?.results)) {
+    return responseBody.results
+  }
+
+  return Array.isArray(responseBody)
+    ? responseBody
+    : []
 }
 
 async function upsertInChunks(
@@ -1049,25 +1260,17 @@ Deno.serve(async (request: Request) => {
     const apiKey =
       await getPluggyApiKey()
 
-    const accountsResponse =
-      await pluggyGet(
-        `/accounts?itemId=${encodeURIComponent(
-          connection.provider_item_id,
-        )}`,
+    const notices: string[] = []
+
+    const accounts =
+      await listPluggyAccounts(
+        connection.provider_item_id,
         apiKey,
       )
 
-    const accounts = Array.isArray(
-      accountsResponse.results,
-    )
-      ? accountsResponse.results
-      : Array.isArray(accountsResponse)
-        ? accountsResponse
-        : []
-
     if (accounts.length === 0) {
-      throw new Error(
-        'A autenticação na Pluggy funcionou, mas o Item não retornou contas.',
+      notices.push(
+        'O Item não retornou contas bancárias. A sincronização continuou para investimentos e empréstimos.',
       )
     }
 
@@ -1079,6 +1282,10 @@ Deno.serve(async (request: Request) => {
     let pendingCardTransactionsCount = 0
     let investmentsCount = 0
     let investmentTransactionsCount = 0
+    let investmentBalanceTotal = 0
+    let investmentGrossTotal = 0
+    let investmentsWithValueCount = 0
+    let loansCount = 0
 
     for (const account of accounts) {
       const transactions =
@@ -1751,6 +1958,9 @@ Deno.serve(async (request: Request) => {
         continue
       }
 
+      const numericSnapshot =
+        getInvestmentNumericSnapshot(investment)
+
       const {
         data: savedPosition,
         error: savedPositionError,
@@ -1790,25 +2000,19 @@ Deno.serve(async (request: Request) => {
             reference_date:
               safeIsoDate(investment?.date),
             unit_value:
-              nullableNumber(investment?.value),
+              numericSnapshot.unitValue,
             quantity:
-              nullableNumber(investment?.quantity),
+              numericSnapshot.quantity,
             gross_amount:
-              nullableNumber(investment?.amount),
+              numericSnapshot.grossAmount,
             net_balance:
-              nullableNumber(investment?.balance),
+              numericSnapshot.netBalance,
             original_amount:
-              nullableNumber(
-                investment?.amountOriginal,
-              ),
+              numericSnapshot.originalAmount,
             profit_amount:
-              nullableNumber(
-                investment?.amountProfit,
-              ),
+              numericSnapshot.profitAmount,
             withdrawal_amount:
-              nullableNumber(
-                investment?.amountWithdrawal,
-              ),
+              numericSnapshot.withdrawalAmount,
             income_taxes:
               nullableNumber(investment?.taxes),
             financial_taxes:
@@ -1868,12 +2072,42 @@ Deno.serve(async (request: Request) => {
       }
 
       investmentsCount += 1
+      investmentBalanceTotal += Number(
+        numericSnapshot.netBalance ?? 0,
+      )
+      investmentGrossTotal += Number(
+        numericSnapshot.grossAmount ?? 0,
+      )
+      if (
+        Number(numericSnapshot.netBalance ?? 0) !== 0 ||
+        Number(numericSnapshot.grossAmount ?? 0) !== 0
+      ) {
+        investmentsWithValueCount += 1
+      }
 
-      const pluggyInvestmentTransactions =
-        await listPluggyInvestmentTransactions(
-          providerInvestmentId,
-          apiKey,
+      let pluggyInvestmentTransactions: any[] = []
+
+      try {
+        pluggyInvestmentTransactions =
+          await listPluggyInvestmentTransactions(
+            providerInvestmentId,
+            apiKey,
+          )
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : 'Falha desconhecida ao consultar movimentações do investimento.'
+
+        notices.push(
+          `${investment?.name ?? providerInvestmentId}: ${message}`,
         )
+
+        console.warn(
+          'Movimentações de investimento não processadas:',
+          message,
+        )
+      }
 
       const investmentRows =
         pluggyInvestmentTransactions.map(
@@ -1935,6 +2169,169 @@ Deno.serve(async (request: Request) => {
         investmentRows.length
     }
 
+    if (pluggyInvestments.length === 0) {
+      notices.push(
+        'A Pluggy não retornou posições de investimento para este Item. Confirme no Meu Pluggy se a conexão do banco foi atualizada e autorizada separadamente para esta aplicação.',
+      )
+    } else if (investmentsWithValueCount === 0) {
+      notices.push(
+        'A Pluggy retornou posições, mas todos os valores financeiros vieram zerados. O sistema preservou os registros para diagnóstico; atualize a conexão no Meu Pluggy e sincronize novamente.',
+      )
+    }
+
+    const investmentDiagnostics = {
+      received: pluggyInvestments.length,
+      saved: investmentsCount,
+      with_value: investmentsWithValueCount,
+      net_balance_total: investmentBalanceTotal,
+      gross_amount_total: investmentGrossTotal,
+      sample_fields: pluggyInvestments.slice(0, 5).map((investment: any) => ({
+        id_suffix: String(investment?.id ?? '').slice(-6),
+        name: investment?.name ?? investment?.code ?? null,
+        type: investment?.type ?? null,
+        status: investment?.status ?? null,
+        has_balance: nullableNumber(investment?.balance) !== null,
+        has_amount: nullableNumber(investment?.amount) !== null,
+        has_quantity: nullableNumber(investment?.quantity) !== null,
+        has_value: nullableNumber(investment?.value) !== null,
+      })),
+    }
+
+    const pluggyLoans =
+      await listPluggyLoans(
+        connection.provider_item_id,
+        apiKey,
+      )
+
+    const { error: staleLoansError } =
+      await supabaseAdmin
+        .from('open_finance_loans')
+        .update({
+          is_current: false,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('connection_id', connection.id)
+
+    if (staleLoansError) {
+      throw new Error(
+        `Erro ao preparar empréstimos: ${staleLoansError.message}`,
+      )
+    }
+
+    const loanRows = pluggyLoans
+      .map((loan: any) => {
+        const providerLoanId = String(
+          loan?.id ?? loan?.providerId ?? '',
+        ).trim()
+
+        if (!providerLoanId) {
+          return null
+        }
+
+        const installments =
+          loan?.installments ?? {}
+
+        return {
+          user_id: user.id,
+          connection_id: connection.id,
+          provider_loan_id: providerLoanId,
+          provider_item_id:
+            loan?.itemId ?? connection.provider_item_id,
+          provider_id: loan?.providerId ?? null,
+          institution_name:
+            loan?.institution?.name ??
+            connection.institution_name,
+          product_name:
+            loan?.productName ??
+            loan?.type ??
+            'Contrato de crédito',
+          loan_type: loan?.type ?? null,
+          status: inferLoanStatus(loan),
+          is_current: true,
+          currency: loan?.currencyCode ?? 'BRL',
+          reference_date: safeIsoDate(loan?.date),
+          contract_date: safeIsoDate(loan?.contractDate),
+          settlement_date: safeIsoDate(loan?.settlementDate),
+          contract_amount: nullableNumber(loan?.contractAmount),
+          outstanding_balance: nullableNumber(
+            loan?.payments?.contractOutstandingBalance,
+          ),
+          due_date: safeIsoDate(loan?.dueDate),
+          installment_periodicity:
+            loan?.installmentPeriodicity ??
+            loan?.instalmentPeriodicity ??
+            null,
+          first_installment_due_date: safeIsoDate(
+            loan?.firstInstallmentDueDate ??
+            loan?.firstInstalmentDueDate,
+          ),
+          cet: nullableNumber(loan?.CET ?? loan?.cet),
+          amortization_system:
+            loan?.amortizationScheduled ?? null,
+          total_installments: nullableNumber(
+            installments?.totalNumberOfInstallments,
+          ),
+          paid_installments: nullableNumber(
+            installments?.paidInstallments,
+          ),
+          due_installments: nullableNumber(
+            installments?.dueInstallments,
+          ),
+          past_due_installments: nullableNumber(
+            installments?.pastDueInstallments ??
+            installments?.pastDueInstalments,
+          ),
+          interest_rates: Array.isArray(loan?.interestRates)
+            ? loan.interestRates
+            : [],
+          contracted_fees: Array.isArray(loan?.contractedFees)
+            ? loan.contractedFees
+            : [],
+          contracted_finance_charges: Array.isArray(
+            loan?.contractedFinanceCharges,
+          )
+            ? loan.contractedFinanceCharges
+            : [],
+          warranties: Array.isArray(loan?.warranties)
+            ? loan.warranties
+            : [],
+          balloon_payments: Array.isArray(
+            installments?.balloonPayments,
+          )
+            ? installments.balloonPayments
+            : [],
+          source_data: {
+            provider: 'PLUGGY',
+            item_id:
+              loan?.itemId ?? connection.provider_item_id,
+            provider_id: loan?.providerId ?? null,
+            collected_at: new Date().toISOString(),
+          },
+          synced_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }
+      })
+      .filter(Boolean)
+
+    await upsertInChunks(
+      supabaseAdmin,
+      'open_finance_loans',
+      loanRows,
+      'connection_id,provider_loan_id',
+    )
+
+    loansCount = loanRows.length
+
+    if (
+      accounts.length === 0 &&
+      investmentsCount === 0 &&
+      loansCount === 0
+    ) {
+      throw new Error(
+        'O Item não retornou contas, investimentos ou contratos de crédito. No Meu Pluggy, autorize este banco separadamente e tente novamente.',
+      )
+    }
+
     const finishedAt =
       new Date().toISOString()
 
@@ -1978,11 +2375,15 @@ Deno.serve(async (request: Request) => {
             investmentsCount,
           investment_transactions:
             investmentTransactionsCount,
+          loans: loansCount,
           details: {
             mode: 'MANUAL',
             provider: 'PLUGGY',
             message:
               'Sincronização manual concluída.',
+            notices,
+            investment_diagnostics:
+              investmentDiagnostics,
           },
         })
         .eq('id', syncLogId)
@@ -2015,7 +2416,12 @@ Deno.serve(async (request: Request) => {
           investmentsCount,
         investment_transactions:
           investmentTransactionsCount,
+        loans:
+          loansCount,
       },
+      investment_diagnostics:
+        investmentDiagnostics,
+      notices,
     })
   } catch (error) {
     const message =

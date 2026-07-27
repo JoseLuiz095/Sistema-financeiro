@@ -22,6 +22,11 @@ import {
   formatPercent,
   today,
 } from '../utils/format'
+import {
+  getInvestmentBalance,
+  getInvestmentOriginalAmount,
+  getInvestmentProfit,
+} from '../utils/openFinance'
 
 function addDays(dateValue, days) {
   const date = new Date(`${dateValue}T12:00:00`)
@@ -101,9 +106,9 @@ export default function DashboardPage({
 
   const importedInvestmentSummary = importedInvestmentPositions.reduce(
     (currentSummary, position) => {
-      currentSummary.balance += Number(position.net_balance ?? 0)
-      currentSummary.original += Number(position.original_amount ?? 0)
-      currentSummary.profit += Number(position.profit_amount ?? 0)
+      currentSummary.balance += getInvestmentBalance(position)
+      currentSummary.original += getInvestmentOriginalAmount(position)
+      currentSummary.profit += getInvestmentProfit(position)
       return currentSummary
     },
     { balance: 0, original: 0, profit: 0 },

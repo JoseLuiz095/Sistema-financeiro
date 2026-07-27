@@ -24,6 +24,7 @@ import {
   parseBrazilianNumber,
   today,
 } from '../utils/format'
+import { getConnectionDisplayName, getInvestmentBalance, getInvestmentOriginalAmount, getInvestmentProfit } from '../utils/openFinance'
 import { randomToken } from '../utils/hash'
 
 const initialAsset = {
@@ -159,9 +160,9 @@ export default function InvestmentsPage({
   const importedSummary = useMemo(() => {
     return importedPositions.reduce(
       (summary, position) => {
-        summary.netBalance += Number(position.net_balance ?? 0)
-        summary.originalAmount += Number(position.original_amount ?? 0)
-        summary.profit += Number(position.profit_amount ?? 0)
+        summary.netBalance += getInvestmentBalance(position)
+        summary.originalAmount += getInvestmentOriginalAmount(position)
+        summary.profit += getInvestmentProfit(position)
         return summary
       },
       {
@@ -401,14 +402,14 @@ export default function InvestmentsPage({
                     <tr><td colSpan="10" className="empty-cell">Nenhuma posição de investimento foi retornada pela conexão atual.</td></tr>
                   ) : importedPositions.map((position) => (
                     <tr key={position.id}>
-                      <td>{position.open_finance_connections?.institution_name || position.institution_name || '-'}</td>
+                      <td>{position.open_finance_connections ? getConnectionDisplayName(position.open_finance_connections) : position.institution_name || '-'}</td>
                       <td><strong>{position.investment_code || position.investment_name}</strong><small>{position.investment_code ? position.investment_name : position.issuer}</small></td>
                       <td>{getImportedInvestmentTypeLabel(position.investment_type, position.investment_subtype)}</td>
                       <td>{position.quantity == null ? '-' : formatNumber(position.quantity)}</td>
                       <td>{position.unit_value == null ? '-' : formatCurrency(position.unit_value, position.currency)}</td>
-                      <td>{position.original_amount == null ? '-' : formatCurrency(position.original_amount, position.currency)}</td>
-                      <td>{formatCurrency(position.net_balance, position.currency)}</td>
-                      <td className={Number(position.profit_amount ?? 0) >= 0 ? 'positive' : 'negative'}>{position.profit_amount == null ? '-' : formatCurrency(position.profit_amount, position.currency)}</td>
+                      <td>{formatCurrency(getInvestmentOriginalAmount(position), position.currency)}</td>
+                      <td>{formatCurrency(getInvestmentBalance(position), position.currency)}</td>
+                      <td className={getInvestmentProfit(position) >= 0 ? 'positive' : 'negative'}>{formatCurrency(getInvestmentProfit(position), position.currency)}</td>
                       <td>{formatDate(position.reference_date)}</td>
                       <td>{formatDate(position.due_date)}</td>
                     </tr>

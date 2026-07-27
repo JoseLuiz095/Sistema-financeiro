@@ -6,9 +6,11 @@ import {
   listOpenFinanceInvestmentTransactions,
   listOpenFinanceSyncLogs,
   listPendingCardTransactions,
+  renameOpenFinanceConnection,
   syncPluggyConnection,
 } from '../services/openFinanceService'
 import { formatCurrency, formatDate, today } from '../utils/format'
+import { getConnectionDisplayName, getInvestmentBalance } from '../utils/openFinance'
 import ConnectBankButton from '../components/ConnectBankButton'
 
 function dateDaysAgo(days) {
@@ -49,6 +51,9 @@ export default function OpenFinancePage({ setFeedback, onChanged }) {
   const [dateFrom, setDateFrom] = useState(dateDaysAgo(90))
   const [dateTo, setDateTo] = useState(today())
   const [lastResult, setLastResult] = useState(null)
+  const [editingConnectionId, setEditingConnectionId] = useState(null)
+  const [connectionName, setConnectionName] = useState('')
+  const [renamingId, setRenamingId] = useState(null)
 
   async function loadData() {
     setLoading(true)
@@ -104,7 +109,7 @@ export default function OpenFinancePage({ setFeedback, onChanged }) {
 
   const investmentBalance = useMemo(
     () => investmentPositions.reduce(
-      (total, position) => total + Number(position.net_balance ?? 0),
+      (total, position) => total + getInvestmentBalance(position),
       0,
     ),
     [investmentPositions],
@@ -130,14 +135,16 @@ export default function OpenFinancePage({ setFeedback, onChanged }) {
         dateTo,
       })
 
+      const connectionLabel = getConnectionDisplayName(connection)
+
       setLastResult({
-        institution: connection.institution_name,
+        institution: connectionLabel,
         ...result,
       })
 
       setFeedback({
         type: 'success',
-        message: `Sincronização manual concluída para ${connection.institution_name}.`,
+        message: `Sincronização manual concluída para ${connectionLabel}.`,
       })
 
       await loadData()
@@ -147,6 +154,40 @@ export default function OpenFinancePage({ setFeedback, onChanged }) {
       await loadData()
     } finally {
       setSyncingId(null)
+    }
+  }
+
+  function startRenaming(connection) {
+    setEditingConnectionId(connection.id)
+    setConnectionName(connection.metadata?.display_name ?? '')
+  }
+
+  function cancelRenaming() {
+    setEditingConnectionId(null)
+    setConnectionName('')
+  }
+
+  async function saveConnectionName(connection) {
+    setRenamingId(connection.id)
+
+    try {
+      await renameOpenFinanceConnection(connection, connectionName)
+      setFeedback({
+        type: 'success',
+        message: connectionName.trim()
+          ? 'Nome da conexão atualizado.'
+          : 'Nome personalizado removido.',
+      })
+      cancelRenaming()
+      await loadData()
+      if (onChanged) await onChanged()
+    } catch (error) {
+      setFeedback({
+        type: 'error',
+        message: `Falha ao renomear a conexão: ${error.message}`,
+      })
+    } finally {
+      setRenamingId(null)
     }
   }
 
@@ -219,7 +260,7 @@ export default function OpenFinancePage({ setFeedback, onChanged }) {
       <section className="panel">
         <div className="panel-header">
           <h2>Conexões cadastradas</h2>
-          <p>Por enquanto, as conexões continuam sendo cadastradas manualmente no banco para testes controlados.</p>
+          <p>Use um nome personalizado para distinguir conta corrente, cartão e investimentos do mesmo banco.</p>
         </div>
 
         <div className="open-finance-connections">
@@ -229,13 +270,23 @@ export default function OpenFinancePage({ setFeedback, onChanged }) {
             connections.map((connection) => {
               const accounts = connection.open_finance_accounts ?? []
               const cards = connection.credit_cards ?? []
+              const positions = (connection.open_finance_investment_positions ?? [])
+                .filter((position) => position.is_current !== false)
+              const positionBalance = positions.reduce(
+                (total, position) => total + getInvestmentBalance(position),
+                0,
+              )
+              const displayName = getConnectionDisplayName(connection)
+              const hasCustomName = Boolean(connection.metadata?.display_name)
+              const isEditing = editingConnectionId === connection.id
 
               return (
                 <article className="open-finance-card" key={connection.id}>
                   <div className="open-finance-card-header">
                     <div>
-                      <h3>{connection.institution_name}</h3>
+                      <h3>{displayName}</h3>
                       <p>
+                        {hasCustomName ? `${connection.institution_name} · ` : ''}
                         {connection.provider} · Item final {String(connection.provider_item_id).slice(-6)}
                       </p>
                     </div>
@@ -244,9 +295,46 @@ export default function OpenFinancePage({ setFeedback, onChanged }) {
                     </span>
                   </div>
 
-                  <div className="open-finance-card-grid">
+                  {isEditing && (
+                    <div className="connection-rename-form">
+                      <label>
+                        Nome personalizado
+                        <input
+                          type="text"
+                          maxLength={80}
+                          value={connectionName}
+                          placeholder={`Ex.: Inter investimentos, Inter conta principal`}
+                          onChange={(event) => setConnectionName(event.target.value)}
+                          autoFocus
+                        />
+                      </label>
+                      <div className="inline-actions">
+                        <button
+                          type="button"
+                          className="primary-button"
+                          disabled={renamingId === connection.id}
+                          onClick={() => saveConnectionName(connection)}
+                        >
+                          {renamingId === connection.id ? 'Salvando...' : 'Salvar nome'}
+                        </button>
+                        <button
+                          type="button"
+                          className="secondary-button"
+                          disabled={renamingId === connection.id}
+                          onClick={cancelRenaming}
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                      <small>Deixe vazio e salve para voltar ao nome original da instituição.</small>
+                    </div>
+                  )}
+
+                  <div className="open-finance-card-grid open-finance-card-grid-extended">
                     <div><span>Contas</span><strong>{accounts.filter((item) => item.account_type !== 'CREDIT_CARD').length}</strong></div>
                     <div><span>Cartões</span><strong>{cards.length}</strong></div>
+                    <div><span>Posições</span><strong>{positions.length}</strong></div>
+                    <div><span>Saldo investido</span><strong>{formatCurrency(positionBalance)}</strong></div>
                     <div><span>Última sincronização</span><strong>{formatDateTime(connection.last_sync_at)}</strong></div>
                     <div><span>Modo</span><strong>Manual</strong></div>
                   </div>
@@ -255,15 +343,25 @@ export default function OpenFinancePage({ setFeedback, onChanged }) {
                     <div className="feedback error">{connection.last_error}</div>
                   )}
 
-                  <div className="inline-actions">
+                  <div className="inline-actions connection-card-actions">
                     <button
                       type="button"
                       className="primary-button"
-                      disabled={syncingId === connection.id}
+                      disabled={syncingId === connection.id || renamingId === connection.id}
                       onClick={() => handleSync(connection)}
                     >
                       {syncingId === connection.id ? 'Sincronizando...' : 'Sincronizar agora'}
                     </button>
+                    {!isEditing && (
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        disabled={syncingId === connection.id}
+                        onClick={() => startRenaming(connection)}
+                      >
+                        Renomear conexão
+                      </button>
+                    )}
                   </div>
                 </article>
               )
@@ -286,6 +384,9 @@ export default function OpenFinancePage({ setFeedback, onChanged }) {
             <article className="summary-card"><span>Posições de investimento</span><strong>{lastResult.result?.investments ?? 0}</strong></article>
             <article className="summary-card"><span>Movimentos de investimento</span><strong>{lastResult.result?.investment_transactions ?? 0}</strong></article>
             <article className="summary-card"><span>Empréstimos e créditos</span><strong>{lastResult.result?.loans ?? 0}</strong></article>
+            <article className="summary-card"><span>Posições com valor</span><strong>{lastResult.investment_diagnostics?.with_value ?? 0}</strong></article>
+            <article className="summary-card"><span>Saldo de investimentos recebido</span><strong>{formatCurrency(lastResult.investment_diagnostics?.net_balance_total ?? 0)}</strong></article>
+            <article className="summary-card"><span>Valor bruto recebido</span><strong>{formatCurrency(lastResult.investment_diagnostics?.gross_amount_total ?? 0)}</strong></article>
           </div>
           {lastResult.notices?.length > 0 && (
             <div className="feedback info sync-notices">
@@ -385,7 +486,7 @@ export default function OpenFinancePage({ setFeedback, onChanged }) {
               ) : logs.map((log) => (
                 <tr key={log.id}>
                   <td>{formatDateTime(log.started_at)}</td>
-                  <td>{log.open_finance_connections?.institution_name || '-'}</td>
+                  <td>{getConnectionDisplayName(log.open_finance_connections)}</td>
                   <td>{formatDate(log.period_from)} a {formatDate(log.period_to)}</td>
                   <td><span className={`status-badge status-${String(log.status).toLowerCase()}`}>{getStatusLabel(log.status)}</span></td>
                   <td>{log.accounts_received}</td>

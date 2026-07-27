@@ -1,6 +1,7 @@
 import AppIcon from '../components/AppIcon'
 import { calculateFinancialSummary } from '../utils/financeSelectors'
 import { formatCurrency, formatDate, today } from '../utils/format'
+import { getInvestmentBalance } from '../utils/openFinance'
 
 function addDays(dateValue, days) {
   const date = new Date(`${dateValue}T12:00:00`)
@@ -53,7 +54,7 @@ export default function HomePage({
   ) + transactions.reduce((total, item) => total + Number(item.amount ?? 0), 0)
 
   const importedInvestments = importedInvestmentPositions.reduce(
-    (total, position) => total + Number(position.net_balance ?? 0),
+    (total, position) => total + getInvestmentBalance(position),
     0,
   )
 

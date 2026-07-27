@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import AppIcon from '../components/AppIcon'
 import DashboardPage from './DashboardPage'
+import DebtsPage from './DebtsPage'
 import PatrimonyPage from './PatrimonyPage'
 import ReportsPage from './ReportsPage'
 
 const SECTIONS = [
   { value: 'overview', label: 'Visão financeira', icon: 'chart' },
+  { value: 'debts', label: 'Crédito e dívidas', icon: 'debt' },
   { value: 'patrimony', label: 'Patrimônio', icon: 'patrimony' },
   { value: 'reports', label: 'Exportar', icon: 'export' },
 ]
@@ -42,7 +44,7 @@ export default function AnalyticsPage({
           <div>
             <span className="eyebrow">Central de análises</span>
             <h2>Detalhes financeiros em formato de BI</h2>
-            <p>Compare períodos, investigue gastos e acompanhe a evolução do patrimônio.</p>
+            <p>Compare períodos, acompanhe crédito, investigue gastos e veja a evolução do patrimônio.</p>
           </div>
         </div>
 
@@ -69,6 +71,10 @@ export default function AnalyticsPage({
           importedInvestmentPositions={importedInvestmentPositions}
           scheduledOccurrences={scheduledOccurrences}
         />
+      )}
+
+      {section === 'debts' && (
+        <DebtsPage setFeedback={setFeedback} />
       )}
 
       {section === 'patrimony' && (

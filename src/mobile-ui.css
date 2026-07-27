@@ -1684,3 +1684,69 @@ textarea,
   border-color: #ead79d;
   background: #fffaf0;
 }
+
+/* =========================================================
+   ETAPA 11 - ANALISE DE CREDITO, APELIDOS E INVESTIMENTOS
+   ========================================================= */
+.open-finance-card-grid-extended {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.connection-rename-form {
+  display: grid;
+  gap: 12px;
+  margin: 14px 0;
+  padding: 14px;
+  border: 1px solid #cfe0f2;
+  border-radius: 13px;
+  background: #f4f8fd;
+}
+
+.connection-rename-form label {
+  display: grid;
+  gap: 7px;
+  color: #344054;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.connection-rename-form small {
+  color: var(--ui-muted);
+  line-height: 1.45;
+}
+
+.connection-card-actions {
+  flex-wrap: wrap;
+}
+
+.connection-card-actions button {
+  flex: 1 1 190px;
+}
+
+@media (max-width: 900px) {
+  .open-finance-card-grid-extended {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .analytics-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .open-finance-card-grid-extended {
+    grid-template-columns: 1fr;
+  }
+
+  .connection-rename-form .inline-actions,
+  .connection-card-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .connection-rename-form .inline-actions button,
+  .connection-card-actions button {
+    width: 100%;
+  }
+}

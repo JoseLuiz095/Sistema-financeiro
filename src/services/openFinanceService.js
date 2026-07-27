@@ -30,6 +30,19 @@ export async function listOpenFinanceConnections() {
         currency,
         status,
         synced_at
+      ),
+      open_finance_investment_positions (
+        id,
+        investment_name,
+        net_balance,
+        gross_amount,
+        withdrawal_amount,
+        original_amount,
+        profit_amount,
+        is_current,
+        currency,
+        source_data,
+        synced_at
       )
     `)
     .eq('provider', 'PLUGGY')
@@ -48,7 +61,8 @@ export async function listOpenFinanceSyncLogs(limit = 50) {
         id,
         institution_name,
         provider,
-        provider_item_id
+        provider_item_id,
+        metadata
       )
     `)
     .order('started_at', { ascending: false })
@@ -153,7 +167,8 @@ export async function listOpenFinanceInvestmentPositions(limit = 1000) {
         id,
         institution_name,
         provider,
-        provider_item_id
+        provider_item_id,
+        metadata
       )
     `)
     .eq('is_current', true)
@@ -197,7 +212,8 @@ export async function listOpenFinanceLoans(limit = 1000) {
         id,
         institution_name,
         provider,
-        provider_item_id
+        provider_item_id,
+        metadata
       )
     `)
     .eq('is_current', true)
@@ -223,7 +239,8 @@ export async function listDebtCreditCardBills(limit = 1000) {
         open_finance_connections (
           id,
           institution_name,
-          provider_item_id
+          provider_item_id,
+          metadata
         )
       )
     `)
@@ -243,7 +260,8 @@ export async function listNegativeOpenFinanceAccounts(limit = 1000) {
       open_finance_connections (
         id,
         institution_name,
-        provider_item_id
+        provider_item_id,
+        metadata
       )
     `)
     .lt('current_balance', 0)
@@ -253,6 +271,27 @@ export async function listNegativeOpenFinanceAccounts(limit = 1000) {
 
   if (error) throw error
   return data ?? []
+}
+
+export async function renameOpenFinanceConnection(connection, displayName) {
+  const normalizedName = String(displayName ?? '').trim().slice(0, 80)
+  const metadata = { ...(connection?.metadata ?? {}) }
+
+  if (normalizedName) {
+    metadata.display_name = normalizedName
+  } else {
+    delete metadata.display_name
+  }
+
+  const { data, error } = await supabase
+    .from('open_finance_connections')
+    .update({ metadata })
+    .eq('id', connection.id)
+    .select('*')
+    .single()
+
+  if (error) throw error
+  return data
 }
 
 export async function createPluggyConnectToken() {
