@@ -1033,3 +1033,376 @@ textarea,
     text-align: left;
   }
 }
+
+/* =========================================================
+   ETAPA 9.1 - CORRECOES MOBILE COMPACTAS
+   ========================================================= */
+.mobile-data-list {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  html,
+  body,
+  #root {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: clip;
+  }
+
+  .app-page {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    padding: 0 10px calc(86px + env(safe-area-inset-bottom));
+    overflow: visible;
+  }
+
+  .compact-app-header {
+    min-width: 0;
+    min-height: 64px;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 8px;
+    margin: 0 -10px;
+    padding: 9px 10px;
+    border-radius: 0 0 14px 14px;
+  }
+
+  .compact-app-header .app-brand {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .compact-app-header .app-brand-mark {
+    width: 39px;
+    height: 39px;
+  }
+
+  .compact-app-header .app-brand-copy {
+    min-width: 0;
+  }
+
+  .compact-app-header .app-brand-copy h1 {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 17px;
+  }
+
+  .compact-app-header .app-brand-copy p {
+    max-width: min(48vw, 210px);
+  }
+
+  .compact-app-header .header-actions {
+    width: auto !important;
+    display: flex !important;
+    grid-template-columns: none !important;
+    flex: 0 0 auto;
+    gap: 5px;
+  }
+
+  .compact-app-header .header-action-button {
+    width: 39px;
+    min-width: 39px;
+    min-height: 39px;
+    height: 39px;
+    padding: 0;
+  }
+
+  .main-nav,
+  .simplified-main-nav {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto;
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 2px;
+    margin: 0;
+    padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
+    border-width: 1px 0 0;
+    border-radius: 16px 16px 0 0;
+    overflow: visible;
+    box-shadow: 0 -8px 28px rgba(20, 38, 64, 0.15);
+  }
+
+  .main-nav button {
+    width: 100%;
+    min-width: 0;
+    min-height: 56px;
+    padding: 4px 1px;
+    border-radius: 11px;
+    overflow: hidden;
+    font-size: 10.5px;
+  }
+
+  .main-nav button > span:last-child {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .nav-icon-wrap {
+    width: 29px;
+    height: 27px;
+  }
+
+  .app-content {
+    width: 100%;
+    min-width: 0;
+    padding-top: 12px;
+  }
+
+  .page-feedback,
+  .page-stack,
+  .panel,
+  .summary-card,
+  .dashboard-grid,
+  .content-grid,
+  .home-grid {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .panel {
+    padding: 15px;
+    border-radius: 16px;
+  }
+
+  .panel-header {
+    margin-bottom: 14px;
+  }
+
+  .panel-header h2 {
+    margin-bottom: 5px;
+    font-size: 19px;
+    line-height: 1.2;
+  }
+
+  .panel-header p {
+    margin: 0;
+    overflow-wrap: anywhere;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .home-hero {
+    width: 100%;
+    display: block;
+    padding: 20px 16px;
+    border-radius: 18px;
+  }
+
+  .home-hero-copy,
+  .home-actions {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .hero-badge {
+    width: fit-content;
+    max-width: 100%;
+    display: flex;
+    margin: 0 0 12px;
+    padding: 6px 9px;
+    white-space: normal;
+    line-height: 1.25;
+  }
+
+  .home-hero .eyebrow {
+    display: block;
+    margin-bottom: 7px;
+  }
+
+  .home-hero h2 {
+    max-width: 100%;
+    margin: 0 0 10px;
+    overflow-wrap: anywhere;
+    font-size: clamp(25px, 8vw, 32px);
+    line-height: 1.08;
+  }
+
+  .home-hero p {
+    max-width: 100%;
+    margin-bottom: 18px;
+  }
+
+  .home-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .summary-grid-4,
+  .home-summary-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .summary-card,
+  .metric-card {
+    min-height: 0;
+    padding: 14px;
+  }
+
+  .metric-card-header {
+    margin-bottom: 9px;
+  }
+
+  .metric-card strong,
+  .summary-card strong {
+    font-size: 22px;
+    overflow-wrap: anywhere;
+  }
+
+  .dashboard-chart-container {
+    width: 100%;
+    max-width: 100%;
+    height: 230px;
+    overflow: hidden;
+  }
+
+  .dashboard-chart-container .recharts-wrapper,
+  .dashboard-chart-container .recharts-surface {
+    max-width: 100% !important;
+  }
+
+  .responsive-data-panel {
+    overflow: hidden;
+  }
+
+  .desktop-data-table {
+    display: none;
+  }
+
+  .mobile-data-list {
+    display: grid;
+    gap: 10px;
+  }
+
+  .mobile-empty-state {
+    padding: 22px 12px;
+    border: 1px dashed var(--ui-border);
+    border-radius: 13px;
+    color: var(--ui-muted);
+    background: var(--ui-soft);
+    text-align: center;
+    font-size: 13px;
+  }
+
+  .mobile-data-card {
+    display: grid;
+    gap: 12px;
+    padding: 14px;
+    border: 1px solid var(--ui-border);
+    border-radius: 14px;
+    background: var(--ui-soft);
+  }
+
+  .mobile-data-card-header {
+    min-width: 0;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .mobile-data-card-header > div:first-child {
+    min-width: 0;
+    display: grid;
+    gap: 3px;
+  }
+
+  .mobile-data-card-header strong {
+    overflow-wrap: anywhere;
+  }
+
+  .mobile-data-card-header span,
+  .mobile-data-card-grid span,
+  .mobile-investment-value span {
+    color: var(--ui-muted);
+    font-size: 11px;
+  }
+
+  .mobile-data-card-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .mobile-data-card-grid > div {
+    min-width: 0;
+    display: grid;
+    gap: 4px;
+    padding: 9px;
+    border-radius: 10px;
+    background: #fff;
+  }
+
+  .mobile-data-card-grid strong {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    font-size: 12px;
+  }
+
+  .mobile-investment-value {
+    flex: 0 0 auto;
+    display: grid;
+    gap: 3px;
+    text-align: right;
+  }
+
+  .mobile-investment-value strong {
+    font-size: 14px;
+  }
+
+  .table-wrapper {
+    max-width: 100%;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: thin;
+  }
+
+  table {
+    min-width: 620px;
+  }
+}
+
+@media (max-width: 380px) {
+  .app-page {
+    padding-right: 8px;
+    padding-left: 8px;
+  }
+
+  .compact-app-header {
+    margin-right: -8px;
+    margin-left: -8px;
+    padding-right: 8px;
+    padding-left: 8px;
+  }
+
+  .compact-app-header .app-brand-copy p {
+    max-width: 40vw;
+  }
+
+  .main-nav button {
+    font-size: 10px;
+  }
+
+  .mobile-data-card-header {
+    display: grid;
+  }
+
+  .mobile-investment-value {
+    text-align: left;
+  }
+}
