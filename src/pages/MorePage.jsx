@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import AppIcon from '../components/AppIcon'
 import AccountsPage from './AccountsPage'
 import CategoriesPage from './CategoriesPage'
 import FutureTransactionsPage from './FutureTransactionsPage'
@@ -6,11 +7,36 @@ import IntegrationsPage from './IntegrationsPage'
 import TransactionsPage from './TransactionsPage'
 
 const OPTIONS = [
-  ['transactions', 'Lançamentos manuais', 'Inclua, revise ou exclua movimentações específicas.'],
-  ['future', 'Lançamentos futuros', 'Controle contas recorrentes, parcelas e previsões.'],
-  ['accounts', 'Contas', 'Cadastre contas usadas em importações e lançamentos.'],
-  ['categories', 'Categorias', 'Organize receitas e despesas para as análises.'],
-  ['integrations', 'Integrações avançadas', 'Gerencie a API receptora e conexões técnicas.'],
+  {
+    value: 'transactions',
+    title: 'Lançamentos manuais',
+    description: 'Inclua, revise ou exclua movimentações específicas.',
+    icon: 'transactions',
+  },
+  {
+    value: 'future',
+    title: 'Lançamentos futuros',
+    description: 'Controle contas recorrentes, parcelas e previsões.',
+    icon: 'future',
+  },
+  {
+    value: 'accounts',
+    title: 'Contas',
+    description: 'Cadastre contas usadas em importações e lançamentos.',
+    icon: 'accounts',
+  },
+  {
+    value: 'categories',
+    title: 'Categorias',
+    description: 'Organize receitas e despesas para as análises.',
+    icon: 'categories',
+  },
+  {
+    value: 'integrations',
+    title: 'Integrações avançadas',
+    description: 'Gerencie a API receptora e conexões técnicas.',
+    icon: 'integrations',
+  },
 ]
 
 export default function MorePage({
@@ -34,24 +60,35 @@ export default function MorePage({
 
   if (section === 'menu') {
     return (
-      <div className="page-stack">
-        <section className="section-intro">
-          <span className="eyebrow">Recursos complementares</span>
-          <h2>Mais opções</h2>
-          <p>Funções menos utilizadas ficam agrupadas aqui para manter o uso diário simples.</p>
+      <div className="page-stack more-page">
+        <section className="section-intro section-intro-card">
+          <div className="section-icon" aria-hidden="true">
+            <AppIcon name="more" size={24} />
+          </div>
+          <div>
+            <span className="eyebrow">Recursos complementares</span>
+            <h2>Mais opções</h2>
+            <p>Funções menos utilizadas ficam agrupadas aqui para manter o uso diário simples.</p>
+          </div>
         </section>
 
         <section className="secondary-option-grid">
-          {OPTIONS.map(([value, title, description]) => (
+          {OPTIONS.map(({ value, title, description, icon }) => (
             <button
               key={value}
               type="button"
               className="secondary-option"
               onClick={() => setSection(value)}
             >
+              <div className="secondary-option-icon" aria-hidden="true">
+                <AppIcon name={icon} size={23} />
+              </div>
               <strong>{title}</strong>
               <span>{description}</span>
-              <small>Abrir →</small>
+              <small className="choice-action">
+                Abrir
+                <AppIcon name="arrow" size={16} />
+              </small>
             </button>
           ))}
         </section>
@@ -61,8 +98,9 @@ export default function MorePage({
 
   return (
     <div className="page-stack">
-      <button type="button" className="back-button" onClick={() => setSection('menu')}>
-        ← Voltar para mais opções
+      <button type="button" className="back-button action-button-with-icon" onClick={() => setSection('menu')}>
+        <span aria-hidden="true">←</span>
+        Voltar para mais opções
       </button>
 
       {section === 'transactions' && (

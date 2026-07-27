@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import AppIcon from '../components/AppIcon'
 import ImportPage from './ImportPage'
 import OpenFinancePage from './OpenFinancePage'
 
@@ -6,14 +7,18 @@ const OPTIONS = [
   {
     value: 'import',
     title: 'Importar extrato',
-    description: 'Envie CSV de bancos e carteiras para revisar antes de gravar.',
+    description: 'Envie um arquivo CSV e revise as movimentações antes de gravar.',
     action: 'Abrir importação',
+    icon: 'upload',
+    badge: 'CSV',
   },
   {
     value: 'openfinance',
     title: 'Open Finance',
-    description: 'Atualize manualmente contas, cartões, faturas e investimentos.',
+    description: 'Conecte instituições e atualize contas, cartões, faturas e investimentos.',
     action: 'Abrir conexão',
+    icon: 'bank',
+    badge: 'Conexão segura',
   },
 ]
 
@@ -34,8 +39,9 @@ export default function DataPage({
   if (section === 'import') {
     return (
       <div className="page-stack">
-        <button type="button" className="back-button" onClick={() => setSection('menu')}>
-          ← Voltar para dados
+        <button type="button" className="back-button action-button-with-icon" onClick={() => setSection('menu')}>
+          <span aria-hidden="true">←</span>
+          Voltar para dados
         </button>
         <ImportPage
           user={user}
@@ -51,8 +57,9 @@ export default function DataPage({
   if (section === 'openfinance') {
     return (
       <div className="page-stack">
-        <button type="button" className="back-button" onClick={() => setSection('menu')}>
-          ← Voltar para dados
+        <button type="button" className="back-button action-button-with-icon" onClick={() => setSection('menu')}>
+          <span aria-hidden="true">←</span>
+          Voltar para dados
         </button>
         <OpenFinancePage setFeedback={setFeedback} onChanged={onChanged} />
       </div>
@@ -60,11 +67,19 @@ export default function DataPage({
   }
 
   return (
-    <div className="page-stack">
-      <section className="section-intro">
-        <span className="eyebrow">Entrada de dados</span>
-        <h2>Como deseja atualizar o sistema?</h2>
-        <p>Escolha uma das duas formas principais. Nenhuma integração automática foi ativada.</p>
+    <div className="page-stack data-page">
+      <section className="section-intro section-intro-card">
+        <div className="section-icon" aria-hidden="true">
+          <AppIcon name="data" size={24} />
+        </div>
+        <div>
+          <span className="eyebrow">Entrada de dados</span>
+          <h2>Como deseja atualizar o sistema?</h2>
+          <p>
+            Escolha a forma mais prática. Você pode importar um extrato ou conectar uma
+            instituição sem ativar sincronizações automáticas.
+          </p>
+        </div>
       </section>
 
       <section className="workspace-choice-grid">
@@ -75,12 +90,28 @@ export default function DataPage({
             className="workspace-choice"
             onClick={() => setSection(option.value)}
           >
-            <span className="choice-marker" aria-hidden="true" />
+            <div className="workspace-choice-top">
+              <div className="workspace-choice-icon" aria-hidden="true">
+                <AppIcon name={option.icon} size={25} />
+              </div>
+              <span className="choice-badge">{option.badge}</span>
+            </div>
             <strong>{option.title}</strong>
             <span>{option.description}</span>
-            <small>{option.action} →</small>
+            <small className="choice-action">
+              {option.action}
+              <AppIcon name="arrow" size={16} />
+            </small>
           </button>
         ))}
+      </section>
+
+      <section className="privacy-strip">
+        <AppIcon name="shield" size={20} />
+        <div>
+          <strong>Seus dados permanecem protegidos</strong>
+          <span>As credenciais da Pluggy ficam nas Edge Functions, não no navegador.</span>
+        </div>
       </section>
     </div>
   )

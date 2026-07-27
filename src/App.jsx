@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import './App.css'
+import './mobile-ui.css'
 import Feedback from './components/Feedback'
+import AppIcon from './components/AppIcon'
 import { supabase } from './lib/supabase'
 import AnalyticsPage from './pages/AnalyticsPage'
 import AuthPage from './pages/AuthPage'
@@ -36,10 +38,10 @@ import {
 import { calculateInvestmentPositions } from './utils/investmentCalculator'
 
 const NAV_ITEMS = [
-  ['home', 'Início'],
-  ['data', 'Dados'],
-  ['analytics', 'Análises'],
-  ['more', 'Mais'],
+  { value: 'home', label: 'Início', icon: 'home' },
+  { value: 'data', label: 'Dados', icon: 'data' },
+  { value: 'analytics', label: 'Análises', icon: 'analytics' },
+  { value: 'more', label: 'Mais', icon: 'more' },
 ]
 
 function LoadingPage() {
@@ -238,93 +240,121 @@ export default function App() {
   return (
     <main className="app-page">
       <header className="app-header compact-app-header">
-        <div>
-          <h1>Financeiro Pessoal</h1>
-          <p>{user.email}</p>
+        <div className="app-brand">
+          <div className="app-brand-mark" aria-hidden="true">
+            <AppIcon name="wallet" size={24} />
+          </div>
+          <div className="app-brand-copy">
+            <span className="app-brand-kicker">Controle financeiro</span>
+            <h1>Financeiro Pessoal</h1>
+            <p>{user.email}</p>
+          </div>
         </div>
+
         <div className="header-actions">
-          <button className="secondary-button" type="button" onClick={loadAllData} disabled={loadingData}>
-            {loadingData ? 'Atualizando...' : 'Atualizar dados'}
+          <button
+            className="secondary-button header-action-button"
+            type="button"
+            onClick={loadAllData}
+            disabled={loadingData}
+            aria-label={loadingData ? 'Atualizando dados' : 'Atualizar dados'}
+          >
+            <AppIcon name="refresh" size={18} className={loadingData ? 'is-spinning' : ''} />
+            <span>{loadingData ? 'Atualizando...' : 'Atualizar'}</span>
           </button>
-          <button className="secondary-button" type="button" onClick={logout}>Sair</button>
+          <button
+            className="secondary-button header-action-button"
+            type="button"
+            onClick={logout}
+            aria-label="Sair do sistema"
+          >
+            <AppIcon name="logout" size={18} />
+            <span>Sair</span>
+          </button>
         </div>
       </header>
 
       <nav className="main-nav simplified-main-nav" aria-label="Navegação principal">
-        {NAV_ITEMS.map(([value, label]) => (
+        {NAV_ITEMS.map(({ value, label, icon }) => (
           <button
             key={value}
             type="button"
             className={activePage === value ? 'active' : ''}
             onClick={() => navigate(value)}
+            aria-current={activePage === value ? 'page' : undefined}
           >
-            {label}
+            <span className="nav-icon-wrap" aria-hidden="true">
+              <AppIcon name={icon} size={20} />
+            </span>
+            <span>{label}</span>
           </button>
         ))}
       </nav>
 
-      <div className="page-feedback"><Feedback feedback={feedback} /></div>
+      <section className="app-content">
+        <div className="page-feedback"><Feedback feedback={feedback} /></div>
 
-      {activePage === 'home' && (
-        <HomePage
-          accounts={accounts}
-          transactions={transactions}
-          investmentResult={investmentResult}
-          importedInvestmentPositions={importedInvestmentPositions}
-          scheduledOccurrences={occurrences}
-          openFinanceConnections={openFinanceConnections}
-          onNavigate={navigate}
-        />
-      )}
+        {activePage === 'home' && (
+          <HomePage
+            accounts={accounts}
+            transactions={transactions}
+            investmentResult={investmentResult}
+            importedInvestmentPositions={importedInvestmentPositions}
+            scheduledOccurrences={occurrences}
+            openFinanceConnections={openFinanceConnections}
+            onNavigate={navigate}
+          />
+        )}
 
-      {activePage === 'data' && (
-        <DataPage
-          key={`data-${navigationRequest.key}`}
-          requestedSection={navigationRequest.section}
-          user={user}
-          accounts={accounts}
-          categories={categories}
-          onChanged={loadAllData}
-          setFeedback={setFeedback}
-        />
-      )}
+        {activePage === 'data' && (
+          <DataPage
+            key={`data-${navigationRequest.key}`}
+            requestedSection={navigationRequest.section}
+            user={user}
+            accounts={accounts}
+            categories={categories}
+            onChanged={loadAllData}
+            setFeedback={setFeedback}
+          />
+        )}
 
-      {activePage === 'analytics' && (
-        <AnalyticsPage
-          key={`analytics-${navigationRequest.key}`}
-          requestedSection={navigationRequest.section}
-          user={user}
-          accounts={accounts}
-          transactions={transactions}
-          assets={assets}
-          operations={operations}
-          quotes={quotes}
-          incomes={incomes}
-          investmentResult={investmentResult}
-          importedInvestmentPositions={importedInvestmentPositions}
-          importedInvestmentTransactions={importedInvestmentTransactions}
-          scheduledOccurrences={occurrences}
-          onChanged={loadAllData}
-          setFeedback={setFeedback}
-        />
-      )}
+        {activePage === 'analytics' && (
+          <AnalyticsPage
+            key={`analytics-${navigationRequest.key}`}
+            requestedSection={navigationRequest.section}
+            user={user}
+            accounts={accounts}
+            transactions={transactions}
+            assets={assets}
+            operations={operations}
+            quotes={quotes}
+            incomes={incomes}
+            investmentResult={investmentResult}
+            importedInvestmentPositions={importedInvestmentPositions}
+            importedInvestmentTransactions={importedInvestmentTransactions}
+            scheduledOccurrences={occurrences}
+            onChanged={loadAllData}
+            setFeedback={setFeedback}
+          />
+        )}
 
-      {activePage === 'more' && (
-        <MorePage
-          key={`more-${navigationRequest.key}`}
-          requestedSection={navigationRequest.section}
-          user={user}
-          accounts={accounts}
-          categories={categories}
-          transactions={transactions}
-          schedules={schedules}
-          occurrences={occurrences}
-          connections={connections}
-          syncLogs={syncLogs}
-          onChanged={loadAllData}
-          setFeedback={setFeedback}
-        />
-      )}
+        {activePage === 'more' && (
+          <MorePage
+            key={`more-${navigationRequest.key}`}
+            requestedSection={navigationRequest.section}
+            user={user}
+            accounts={accounts}
+            categories={categories}
+            transactions={transactions}
+            schedules={schedules}
+            occurrences={occurrences}
+            connections={connections}
+            syncLogs={syncLogs}
+            onChanged={loadAllData}
+            setFeedback={setFeedback}
+          />
+        )}
+      </section>
     </main>
   )
 }

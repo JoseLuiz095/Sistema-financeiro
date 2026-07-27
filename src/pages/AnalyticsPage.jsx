@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
+import AppIcon from '../components/AppIcon'
 import DashboardPage from './DashboardPage'
 import PatrimonyPage from './PatrimonyPage'
 import ReportsPage from './ReportsPage'
 
 const SECTIONS = [
-  ['overview', 'Visão financeira'],
-  ['patrimony', 'Patrimônio'],
-  ['reports', 'Exportar'],
+  { value: 'overview', label: 'Visão financeira', icon: 'chart' },
+  { value: 'patrimony', label: 'Patrimônio', icon: 'patrimony' },
+  { value: 'reports', label: 'Exportar', icon: 'export' },
 ]
 
 export default function AnalyticsPage({
@@ -32,23 +33,30 @@ export default function AnalyticsPage({
   }, [requestedSection])
 
   return (
-    <div className="page-stack">
-      <section className="analytics-heading">
-        <div>
-          <span className="eyebrow">Central de análises</span>
-          <h2>Detalhes financeiros em formato de BI</h2>
-          <p>Use filtros, comparações e relatórios sem poluir a navegação principal.</p>
+    <div className="page-stack analytics-page">
+      <section className="analytics-heading panel-heading-surface">
+        <div className="analytics-title-wrap">
+          <div className="section-icon" aria-hidden="true">
+            <AppIcon name="analytics" size={24} />
+          </div>
+          <div>
+            <span className="eyebrow">Central de análises</span>
+            <h2>Detalhes financeiros em formato de BI</h2>
+            <p>Compare períodos, investigue gastos e acompanhe a evolução do patrimônio.</p>
+          </div>
         </div>
 
         <nav className="sub-nav analytics-nav" aria-label="Seções de análises">
-          {SECTIONS.map(([value, label]) => (
+          {SECTIONS.map(({ value, label, icon }) => (
             <button
               key={value}
               type="button"
               className={section === value ? 'active' : ''}
               onClick={() => setSection(value)}
+              aria-current={section === value ? 'page' : undefined}
             >
-              {label}
+              <AppIcon name={icon} size={17} />
+              <span>{label}</span>
             </button>
           ))}
         </nav>

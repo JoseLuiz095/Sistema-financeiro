@@ -1,3 +1,4 @@
+import AppIcon from '../components/AppIcon'
 import { calculateFinancialSummary } from '../utils/financeSelectors'
 import { formatCurrency, formatDate, today } from '../utils/format'
 
@@ -6,6 +7,31 @@ function addDays(dateValue, days) {
   date.setDate(date.getDate() + days)
   return date.toISOString().slice(0, 10)
 }
+
+const SUMMARY_ITEMS = [
+  {
+    key: 'balance',
+    label: 'Saldo acompanhado',
+    icon: 'wallet',
+    helper: 'Contas cadastradas e movimentações importadas.',
+  },
+  {
+    key: 'month',
+    label: 'Resultado do mês',
+    icon: 'trend',
+    helper: 'Receitas menos despesas operacionais.',
+  },
+  {
+    key: 'investments',
+    label: 'Investimentos',
+    icon: 'investments',
+  },
+  {
+    key: 'future',
+    label: 'Próximos 30 dias',
+    icon: 'calendar',
+  },
+]
 
 export default function HomePage({
   accounts,
@@ -55,100 +81,129 @@ export default function HomePage({
     (connection) => connection.status === 'ACTIVE',
   ).length
 
+  const summaryValues = {
+    balance: {
+      value: formatCurrency(accountBalance),
+      tone: accountBalance >= 0 ? 'positive' : 'negative',
+      helper: SUMMARY_ITEMS[0].helper,
+    },
+    month: {
+      value: formatCurrency(summary.surplus),
+      tone: summary.surplus >= 0 ? 'positive' : 'negative',
+      helper: SUMMARY_ITEMS[1].helper,
+    },
+    investments: {
+      value: formatCurrency(calculatedInvestments || importedInvestments),
+      tone: '',
+      helper: calculatedInvestments > 0
+        ? 'Carteira calculada pelas operações.'
+        : 'Posições informadas pelo Open Finance.',
+    },
+    future: {
+      value: formatCurrency(futureResult),
+      tone: futureResult >= 0 ? 'positive' : 'negative',
+      helper: `${upcoming.length} compromisso(s) previsto(s).`,
+    },
+  }
+
   return (
-    <div className="page-stack">
+    <div className="page-stack home-page">
       <section className="home-hero panel">
-        <div>
+        <div className="home-hero-copy">
+          <div className="hero-badge">
+            <AppIcon name="shield" size={16} />
+            Atualização segura e manual
+          </div>
           <span className="eyebrow">Visão rápida</span>
-          <h2>Seu financeiro sem complicação</h2>
+          <h2>Seu financeiro organizado em um só lugar</h2>
           <p>
-            Atualize os dados por extrato ou Open Finance e use a área de análises
-            para investigar gastos, fluxo futuro e patrimônio.
+            Importe extratos, conecte instituições e acompanhe gastos, patrimônio e
+            compromissos futuros com uma leitura simples no celular ou computador.
           </p>
         </div>
 
         <div className="home-actions">
           <button
             type="button"
-            className="primary-button"
+            className="primary-button action-button-with-icon"
             onClick={() => onNavigate('data', 'import')}
           >
+            <AppIcon name="upload" size={18} />
             Importar extrato
           </button>
           <button
             type="button"
-            className="secondary-button"
+            className="secondary-button action-button-with-icon"
             onClick={() => onNavigate('data', 'openfinance')}
           >
-            Atualizar Open Finance
+            <AppIcon name="bank" size={18} />
+            Open Finance
           </button>
           <button
             type="button"
-            className="secondary-button"
+            className="secondary-button action-button-with-icon"
             onClick={() => onNavigate('analytics', 'overview')}
           >
+            <AppIcon name="analytics" size={18} />
             Abrir análises
           </button>
         </div>
       </section>
 
-      <section className="summary-grid summary-grid-4">
-        <article className="summary-card">
-          <span>Saldo acompanhado</span>
-          <strong>{formatCurrency(accountBalance)}</strong>
-          <small>Contas cadastradas e movimentações importadas.</small>
-        </article>
-        <article className="summary-card">
-          <span>Resultado do mês</span>
-          <strong className={summary.surplus >= 0 ? 'positive' : 'negative'}>
-            {formatCurrency(summary.surplus)}
-          </strong>
-          <small>Receitas menos despesas operacionais.</small>
-        </article>
-        <article className="summary-card">
-          <span>Investimentos acompanhados</span>
-          <strong>{formatCurrency(calculatedInvestments || importedInvestments)}</strong>
-          <small>
-            {calculatedInvestments > 0
-              ? 'Carteira calculada pelas operações.'
-              : 'Posições informadas pelo Open Finance.'}
-          </small>
-        </article>
-        <article className="summary-card">
-          <span>Projeção de 30 dias</span>
-          <strong className={futureResult >= 0 ? 'positive' : 'negative'}>
-            {formatCurrency(futureResult)}
-          </strong>
-          <small>{upcoming.length} compromisso(s) previsto(s).</small>
-        </article>
+      <section className="summary-grid summary-grid-4 home-summary-grid">
+        {SUMMARY_ITEMS.map((item) => {
+          const metric = summaryValues[item.key]
+
+          return (
+            <article className={`summary-card metric-card metric-${item.key}`} key={item.key}>
+              <div className="metric-card-header">
+                <div className="metric-icon" aria-hidden="true">
+                  <AppIcon name={item.icon} size={20} />
+                </div>
+                <span>{item.label}</span>
+              </div>
+              <strong className={metric.tone}>{metric.value}</strong>
+              <small>{metric.helper}</small>
+            </article>
+          )
+        })}
       </section>
 
       <div className="home-grid">
-        <section className="panel">
+        <section className="panel recent-panel">
           <div className="panel-header row-between">
             <div>
+              <span className="panel-kicker">Atividade recente</span>
               <h2>Movimentações recentes</h2>
               <p>Últimos registros financeiros disponíveis.</p>
             </div>
             <button
               type="button"
-              className="text-button"
+              className="text-button action-button-with-icon"
               onClick={() => onNavigate('more', 'transactions')}
             >
               Ver todas
+              <AppIcon name="arrow" size={16} />
             </button>
           </div>
 
           <div className="compact-list">
             {recentTransactions.length === 0 ? (
-              <p className="empty-message">Nenhuma movimentação disponível.</p>
+              <div className="empty-state compact-empty-state">
+                <div className="empty-state-icon"><AppIcon name="transactions" size={22} /></div>
+                <strong>Nenhuma movimentação disponível</strong>
+                <span>Importe um extrato ou conecte uma instituição para começar.</span>
+              </div>
             ) : recentTransactions.map((transaction) => (
               <article className="compact-list-item" key={transaction.id}>
-                <div>
-                  <strong>{transaction.normalized_description || transaction.original_description}</strong>
-                  <span>{formatDate(transaction.transaction_date)}</span>
+                <div className="transaction-main">
+                  <span className={`transaction-dot ${Number(transaction.amount) >= 0 ? 'income' : 'expense'}`} />
+                  <div>
+                    <strong>{transaction.normalized_description || transaction.original_description}</strong>
+                    <span>{formatDate(transaction.transaction_date)}</span>
+                  </div>
                 </div>
-                <strong className={Number(transaction.amount) >= 0 ? 'positive' : 'negative'}>
+                <strong className={`transaction-value ${Number(transaction.amount) >= 0 ? 'positive' : 'negative'}`}>
                   {formatCurrency(transaction.amount)}
                 </strong>
               </article>
@@ -156,8 +211,9 @@ export default function HomePage({
           </div>
         </section>
 
-        <section className="panel">
+        <section className="panel data-health-panel">
           <div className="panel-header">
+            <span className="panel-kicker">Cobertura</span>
             <h2>Status dos dados</h2>
             <p>Resumo das fontes utilizadas pelo sistema.</p>
           </div>
@@ -168,7 +224,7 @@ export default function HomePage({
               <strong>{accounts.length}</strong>
             </div>
             <div>
-              <span>Conexões Open Finance ativas</span>
+              <span>Conexões Open Finance</span>
               <strong>{activeConnections}</strong>
             </div>
             <div>
@@ -176,16 +232,17 @@ export default function HomePage({
               <strong>{transactions.length}</strong>
             </div>
             <div>
-              <span>Posições Open Finance</span>
+              <span>Posições de investimento</span>
               <strong>{importedInvestmentPositions.length}</strong>
             </div>
           </div>
 
           <button
             type="button"
-            className="secondary-button full-width-button"
+            className="secondary-button full-width-button action-button-with-icon"
             onClick={() => onNavigate('data')}
           >
+            <AppIcon name="data" size={18} />
             Gerenciar fontes de dados
           </button>
         </section>
