@@ -187,3 +187,59 @@ export async function listOpenFinanceInvestmentTransactions(limit = 5000) {
   if (error) throw error
   return data ?? []
 }
+export async function createPluggyConnectToken() {
+  const { data, error } =
+    await supabase.functions.invoke(
+      'pluggy-connect',
+      {
+        body: {
+          action: 'create-token',
+        },
+      },
+    )
+
+  if (error) {
+    throw new Error(
+      await extractFunctionError(error),
+    )
+  }
+
+  if (!data?.success || !data?.accessToken) {
+    throw new Error(
+      data?.error ??
+        'Não foi possível criar o Connect Token.',
+    )
+  }
+
+  return data.accessToken
+}
+
+export async function registerPluggyItem(
+  itemId,
+) {
+  const { data, error } =
+    await supabase.functions.invoke(
+      'pluggy-connect',
+      {
+        body: {
+          action: 'register-item',
+          itemId,
+        },
+      },
+    )
+
+  if (error) {
+    throw new Error(
+      await extractFunctionError(error),
+    )
+  }
+
+  if (!data?.success) {
+    throw new Error(
+      data?.error ??
+        'Não foi possível registrar a conexão.',
+    )
+  }
+
+  return data.connection
+}

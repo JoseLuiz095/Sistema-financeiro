@@ -9,6 +9,7 @@ import {
   syncPluggyConnection,
 } from '../services/openFinanceService'
 import { formatCurrency, formatDate, today } from '../utils/format'
+import ConnectBankButton from '../components/ConnectBankButton'
 
 function dateDaysAgo(days) {
   const date = new Date()
@@ -173,15 +174,28 @@ export default function OpenFinancePage({ setFeedback, onChanged }) {
 
       <section className="panel">
         <div className="panel-header">
-          <h2>Open Finance em modo manual</h2>
+          <h2>Open Finance</h2>
+
           <p>
-            Nesta fase, nenhum webhook, agendamento automático ou nova conta real será ativado.
-            O botão abaixo apenas copia para o Supabase os dados atualmente disponíveis no Item da Pluggy.
+            Conecte uma instituição e atualize os dados manualmente quando necessário.
           </p>
         </div>
 
         <div className="info-callout">
           A leitura manual não movimenta dinheiro e não inicia pagamentos. As credenciais da Pluggy continuam protegidas nos Secrets da Edge Function.
+        </div>
+
+        <div className="inline-actions">
+          <ConnectBankButton
+            setFeedback={setFeedback}
+            onConnected={async () => {
+              await loadData()
+
+              if (onChanged) {
+                await onChanged()
+              }
+            }}
+          />
         </div>
 
         <div className="open-finance-toolbar">

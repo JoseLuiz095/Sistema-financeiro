@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4'
+import { PluggyConnect } from 'react-pluggy-connect'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
