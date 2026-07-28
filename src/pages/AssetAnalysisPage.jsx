@@ -199,7 +199,6 @@ function DataQuality({ analysis }) {
 
 export default function AssetAnalysisPage({
   user,
-  assets = [],
   importedPositions = [],
   setFeedback: setGlobalFeedback,
 }) {
@@ -249,16 +248,6 @@ export default function AssetAnalysisPage({
   const tickerOptions = useMemo(() => {
     const values = new Map()
 
-    assets.forEach((asset) => {
-      const ticker = normalizeTicker(asset.ticker)
-      if (ticker) {
-        values.set(ticker, {
-          ticker,
-          label: `${ticker} - ${asset.asset_name || ticker}`,
-        })
-      }
-    })
-
     importedPositions.forEach((position) => {
       const ticker = normalizeTicker(
         position.investment_code || position.investment_name,
@@ -275,7 +264,7 @@ export default function AssetAnalysisPage({
     return [...values.values()].sort((a, b) =>
       a.ticker.localeCompare(b.ticker),
     )
-  }, [assets, importedPositions])
+  }, [importedPositions])
 
   const portfolioTickerSet = useMemo(
     () => new Set(tickerOptions.map((item) => item.ticker)),

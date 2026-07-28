@@ -3,31 +3,36 @@ import AppIcon from '../components/AppIcon'
 import AssetAnalysisPage from './AssetAnalysisPage'
 import DashboardPage from './DashboardPage'
 import DebtsPage from './DebtsPage'
-import PatrimonyPage from './PatrimonyPage'
 import ReportsPage from './ReportsPage'
 
 const SECTIONS = [
-  { value: 'overview', label: 'Visao financeira', icon: 'chart' },
-  { value: 'assets', label: 'Analise de ativos', icon: 'trend' },
-  { value: 'debts', label: 'Credito e dividas', icon: 'debt' },
-  { value: 'patrimony', label: 'Patrimonio', icon: 'patrimony' },
-  { value: 'reports', label: 'Exportar', icon: 'export' },
+  {
+    value: 'overview',
+    label: 'Visão financeira',
+    icon: 'chart',
+  },
+  {
+    value: 'assets',
+    label: 'Análise de ativos',
+    icon: 'trend',
+  },
+  {
+    value: 'debts',
+    label: 'Crédito e dívidas',
+    icon: 'debt',
+  },
+  {
+    value: 'reports',
+    label: 'Exportar',
+    icon: 'export',
+  },
 ]
 
 export default function AnalyticsPage({
   requestedSection,
   user,
-  accounts,
   transactions,
-  assets,
-  operations,
-  quotes,
-  incomes,
-  investmentResult,
-  importedInvestmentPositions,
-  importedInvestmentTransactions,
-  scheduledOccurrences,
-  onChanged,
+  importedInvestmentPositions = [],
   setFeedback,
 }) {
   const [section, setSection] = useState(
@@ -35,78 +40,93 @@ export default function AnalyticsPage({
   )
 
   useEffect(() => {
-    if (requestedSection) setSection(requestedSection)
+    if (requestedSection) {
+      setSection(requestedSection)
+    }
   }, [requestedSection])
 
   return (
     <div className="page-stack analytics-page">
       <section className="analytics-heading panel-heading-surface">
         <div className="analytics-title-wrap">
-          <div className="section-icon" aria-hidden="true">
-            <AppIcon name="analytics" size={24} />
+          <div
+            className="section-icon"
+            aria-hidden="true"
+          >
+            <AppIcon
+              name="analytics"
+              size={24}
+            />
           </div>
+
           <div>
-            <span className="eyebrow">Central de analises</span>
-            <h2>Detalhes financeiros em formato de BI</h2>
+            <span className="eyebrow">
+              Central de análises
+            </span>
+            <h2>
+              Dados financeiros consolidados em formato de BI
+            </h2>
             <p>
-              Compare periodos, acompanhe credito, estude ativos e veja a evolucao do patrimonio.
+              Analise extratos, Open Finance, despesas,
+              crédito e ativos sem depender de lançamentos
+              manuais de patrimônio.
             </p>
           </div>
         </div>
 
         <nav
           className="sub-nav analytics-nav"
-          aria-label="Secoes de analises"
+          aria-label="Seções de análises"
         >
-          {SECTIONS.map(({ value, label, icon }) => (
-            <button
-              key={value}
-              type="button"
-              className={section === value ? 'active' : ''}
-              onClick={() => setSection(value)}
-              aria-current={section === value ? 'page' : undefined}
-            >
-              <AppIcon name={icon} size={17} />
-              <span>{label}</span>
-            </button>
-          ))}
+          {SECTIONS.map(
+            ({ value, label, icon }) => (
+              <button
+                key={value}
+                type="button"
+                className={
+                  section === value
+                    ? 'active'
+                    : ''
+                }
+                onClick={() => setSection(value)}
+                aria-current={
+                  section === value
+                    ? 'page'
+                    : undefined
+                }
+              >
+                <AppIcon
+                  name={icon}
+                  size={17}
+                />
+                <span>{label}</span>
+              </button>
+            ),
+          )}
         </nav>
       </section>
 
       {section === 'overview' && (
         <DashboardPage
           transactions={transactions}
-          investmentResult={investmentResult}
-          importedInvestmentPositions={importedInvestmentPositions}
-          scheduledOccurrences={scheduledOccurrences}
+          importedInvestmentPositions={
+            importedInvestmentPositions
+          }
         />
       )}
 
       {section === 'assets' && (
         <AssetAnalysisPage
           user={user}
-          assets={assets}
-          importedPositions={importedInvestmentPositions}
+          importedPositions={
+            importedInvestmentPositions
+          }
           setFeedback={setFeedback}
         />
       )}
 
       {section === 'debts' && (
-        <DebtsPage setFeedback={setFeedback} />
-      )}
-
-      {section === 'patrimony' && (
-        <PatrimonyPage
-          user={user}
-          accounts={accounts}
-          assets={assets}
-          operations={operations}
-          quotes={quotes}
-          incomes={incomes}
-          investmentResult={investmentResult}
-          importedInvestmentPositions={importedInvestmentPositions}
-          importedInvestmentTransactions={importedInvestmentTransactions}
-          onChanged={onChanged}
+        <DebtsPage
           setFeedback={setFeedback}
         />
       )}
@@ -115,10 +135,6 @@ export default function AnalyticsPage({
         <ReportsPage
           user={user}
           transactions={transactions}
-          assets={assets}
-          operations={operations}
-          quotes={quotes}
-          incomes={incomes}
         />
       )}
     </div>

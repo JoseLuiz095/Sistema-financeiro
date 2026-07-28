@@ -1,53 +1,32 @@
-import { useEffect, useState } from 'react'
+import {
+  useEffect,
+  useState,
+} from 'react'
 import AppIcon from '../components/AppIcon'
-import AccountsPage from './AccountsPage'
 import CategoriesPage from './CategoriesPage'
-import FutureTransactionsPage from './FutureTransactionsPage'
 import IntegrationsPage from './IntegrationsPage'
 import SecurityPage from './SecurityPage'
-import TransactionsPage from './TransactionsPage'
 
 const OPTIONS = [
-  {
-    value: 'transactions',
-    title: 'Lançamentos manuais',
-    description:
-      'Inclua, revise ou exclua movimentações específicas.',
-    icon: 'transactions',
-  },
-  {
-    value: 'future',
-    title: 'Lançamentos futuros',
-    description:
-      'Controle contas recorrentes, parcelas e previsões.',
-    icon: 'future',
-  },
-  {
-    value: 'accounts',
-    title: 'Contas',
-    description:
-      'Cadastre contas usadas em importações e lançamentos.',
-    icon: 'accounts',
-  },
   {
     value: 'categories',
     title: 'Categorias',
     description:
-      'Organize receitas e despesas para as análises.',
+      'Organize as movimentações importadas para melhorar as análises.',
     icon: 'categories',
   },
   {
     value: 'security',
     title: 'Segurança da conta',
     description:
-      'Ative o autenticador, altere a senha e encerre sessões.',
+      'Gerencie autenticador, senha e sessões abertas.',
     icon: 'shield',
   },
   {
     value: 'integrations',
     title: 'Integrações avançadas',
     description:
-      'Gerencie a API receptora e conexões técnicas.',
+      'Acompanhe conexões técnicas, APIs e sincronizações.',
     icon: 'integrations',
   },
 ]
@@ -57,16 +36,14 @@ export default function MorePage({
   user,
   accounts,
   categories,
-  transactions,
-  schedules,
-  occurrences,
   connections,
   syncLogs,
   onChanged,
   setFeedback,
 }) {
-  const [section, setSection] =
-    useState(requestedSection || 'menu')
+  const [section, setSection] = useState(
+    requestedSection || 'menu',
+  )
 
   useEffect(() => {
     if (requestedSection) {
@@ -82,16 +59,20 @@ export default function MorePage({
             className="section-icon"
             aria-hidden="true"
           >
-            <AppIcon name="more" size={24} />
+            <AppIcon
+              name="more"
+              size={24}
+            />
           </div>
+
           <div>
             <span className="eyebrow">
-              Recursos complementares
+              Configurações do sistema
             </span>
             <h2>Mais opções</h2>
             <p>
-              Funções menos utilizadas ficam agrupadas
-              aqui para manter o uso diário simples.
+              Somente configurações necessárias para
+              manter as fontes e análises organizadas.
             </p>
           </div>
         </section>
@@ -121,6 +102,7 @@ export default function MorePage({
                     size={23}
                   />
                 </div>
+
                 <strong>{title}</strong>
                 <span>{description}</span>
                 <small className="choice-action">
@@ -148,38 +130,6 @@ export default function MorePage({
         <span aria-hidden="true">←</span>
         Voltar para mais opções
       </button>
-
-      {section === 'transactions' && (
-        <TransactionsPage
-          user={user}
-          accounts={accounts}
-          categories={categories}
-          transactions={transactions}
-          onChanged={onChanged}
-          setFeedback={setFeedback}
-        />
-      )}
-
-      {section === 'future' && (
-        <FutureTransactionsPage
-          user={user}
-          accounts={accounts}
-          categories={categories}
-          schedules={schedules}
-          occurrences={occurrences}
-          onChanged={onChanged}
-          setFeedback={setFeedback}
-        />
-      )}
-
-      {section === 'accounts' && (
-        <AccountsPage
-          user={user}
-          accounts={accounts}
-          onChanged={onChanged}
-          setFeedback={setFeedback}
-        />
-      )}
 
       {section === 'categories' && (
         <CategoriesPage
