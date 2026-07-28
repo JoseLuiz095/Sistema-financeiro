@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react'
 import AppIcon from '../components/AppIcon'
+import AssetAnalysisPage from './AssetAnalysisPage'
 import DashboardPage from './DashboardPage'
 import DebtsPage from './DebtsPage'
 import PatrimonyPage from './PatrimonyPage'
 import ReportsPage from './ReportsPage'
 
 const SECTIONS = [
-  { value: 'overview', label: 'Visão financeira', icon: 'chart' },
-  { value: 'debts', label: 'Crédito e dívidas', icon: 'debt' },
-  { value: 'patrimony', label: 'Patrimônio', icon: 'patrimony' },
+  { value: 'overview', label: 'Visao financeira', icon: 'chart' },
+  { value: 'assets', label: 'Analise de ativos', icon: 'trend' },
+  { value: 'debts', label: 'Credito e dividas', icon: 'debt' },
+  { value: 'patrimony', label: 'Patrimonio', icon: 'patrimony' },
   { value: 'reports', label: 'Exportar', icon: 'export' },
 ]
 
@@ -28,7 +30,9 @@ export default function AnalyticsPage({
   onChanged,
   setFeedback,
 }) {
-  const [section, setSection] = useState(requestedSection || 'overview')
+  const [section, setSection] = useState(
+    requestedSection || 'overview',
+  )
 
   useEffect(() => {
     if (requestedSection) setSection(requestedSection)
@@ -42,13 +46,18 @@ export default function AnalyticsPage({
             <AppIcon name="analytics" size={24} />
           </div>
           <div>
-            <span className="eyebrow">Central de análises</span>
+            <span className="eyebrow">Central de analises</span>
             <h2>Detalhes financeiros em formato de BI</h2>
-            <p>Compare períodos, acompanhe crédito, investigue gastos e veja a evolução do patrimônio.</p>
+            <p>
+              Compare periodos, acompanhe credito, estude ativos e veja a evolucao do patrimonio.
+            </p>
           </div>
         </div>
 
-        <nav className="sub-nav analytics-nav" aria-label="Seções de análises">
+        <nav
+          className="sub-nav analytics-nav"
+          aria-label="Secoes de analises"
+        >
           {SECTIONS.map(({ value, label, icon }) => (
             <button
               key={value}
@@ -70,6 +79,15 @@ export default function AnalyticsPage({
           investmentResult={investmentResult}
           importedInvestmentPositions={importedInvestmentPositions}
           scheduledOccurrences={scheduledOccurrences}
+        />
+      )}
+
+      {section === 'assets' && (
+        <AssetAnalysisPage
+          user={user}
+          assets={assets}
+          importedPositions={importedInvestmentPositions}
+          setFeedback={setFeedback}
         />
       )}
 
