@@ -522,3 +522,254 @@
     border: 0;
   }
 }
+
+/* Catálogo completo de ativos B3 */
+.asset-selector-form {
+  min-width: min(100%, 440px);
+}
+
+.asset-selected-control {
+  display: grid;
+  gap: 7px;
+}
+
+.asset-selected-control > span,
+.asset-catalog-search > span {
+  color: #334155;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.asset-selected-button {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  width: 100%;
+  padding: 9px 13px;
+  border: 1px solid var(--asset-border);
+  border-radius: 11px;
+  color: #0f2742;
+  background: #ffffff;
+  text-align: left;
+}
+
+.asset-selected-button:hover,
+.asset-selected-button[aria-expanded='true'] {
+  border-color: var(--asset-blue);
+  box-shadow: 0 0 0 3px rgba(23, 103, 184, 0.12);
+}
+
+.asset-selected-button div,
+.asset-selected-button strong,
+.asset-selected-button small {
+  display: block;
+  min-width: 0;
+}
+
+.asset-selected-button strong {
+  font-size: 16px;
+}
+
+.asset-selected-button small {
+  margin-top: 2px;
+  overflow: hidden;
+  color: var(--asset-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.asset-catalog {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 14px;
+  margin-top: 4px;
+  padding: 16px;
+  border: 1px solid var(--asset-border);
+  border-radius: 15px;
+  background: #f8fafc;
+}
+
+.asset-catalog-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 320px);
+  align-items: end;
+  gap: 14px;
+}
+
+.asset-catalog-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.asset-catalog-filters button {
+  min-height: 36px;
+  padding: 7px 11px;
+  border: 1px solid var(--asset-border);
+  border-radius: 999px;
+  color: #36516d;
+  background: #ffffff;
+  font-weight: 750;
+}
+
+.asset-catalog-filters button.active {
+  border-color: var(--asset-blue);
+  color: #ffffff;
+  background: var(--asset-blue);
+}
+
+.asset-catalog-search {
+  display: grid;
+  gap: 6px;
+}
+
+.asset-catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 9px;
+  max-height: 470px;
+  overflow: auto;
+  padding-right: 3px;
+}
+
+.asset-catalog-grid > button {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--asset-border);
+  border-radius: 11px;
+  color: #172f49;
+  background: #ffffff;
+  text-align: left;
+}
+
+.asset-catalog-grid > button:hover,
+.asset-catalog-grid > button.selected {
+  border-color: var(--asset-blue);
+  background: #edf6ff;
+}
+
+.asset-catalog-grid strong,
+.asset-catalog-grid span,
+.asset-catalog-grid small {
+  display: block;
+  min-width: 0;
+}
+
+.asset-catalog-grid span {
+  margin-top: 3px;
+  overflow: hidden;
+  color: #50657c;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.asset-catalog-grid small {
+  color: var(--asset-muted);
+  font-size: 11px;
+}
+
+.asset-catalog-status {
+  padding: 30px;
+  color: var(--asset-muted);
+  text-align: center;
+}
+
+.asset-catalog-more {
+  justify-self: center;
+}
+
+.asset-catalog-count {
+  color: var(--asset-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+/* Detalhamento da saúde financeira */
+.asset-health-details {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid var(--asset-border);
+  border-radius: 11px;
+  background: #f8fafc;
+}
+
+.asset-health-details summary {
+  cursor: pointer;
+  color: #23415f;
+  font-weight: 800;
+}
+
+.asset-health-details section {
+  margin-top: 13px;
+}
+
+.asset-health-details h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.asset-health-detail-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.asset-health-detail-list > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.asset-health-detail-list span {
+  color: var(--asset-muted);
+  font-size: 12px;
+}
+
+.asset-health-detail-list strong {
+  font-size: 12px;
+}
+
+@media (max-width: 1100px) {
+  .asset-catalog-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .asset-selector-form,
+  .asset-catalog-toolbar,
+  .asset-catalog-grid,
+  .asset-health-detail-list {
+    grid-template-columns: 1fr;
+  }
+
+  .asset-selector-form {
+    min-width: 0;
+  }
+
+  .asset-catalog {
+    padding: 12px;
+  }
+
+  .asset-catalog-grid {
+    max-height: 58vh;
+  }
+
+  .asset-catalog-filters {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 3px;
+  }
+
+  .asset-catalog-filters button {
+    flex: 0 0 auto;
+  }
+}

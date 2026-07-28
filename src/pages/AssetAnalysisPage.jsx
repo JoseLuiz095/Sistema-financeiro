@@ -12,6 +12,7 @@ import {
   getAssetAnalysisPreference,
   getAssetHistory,
   listCostBasisAdjustments,
+  listMarketAssets,
   saveAssetAnalysisPreference,
   saveCostBasisAdjustment,
 } from '../services/assetAnalysisService'
@@ -46,7 +47,44 @@ const RANGE_OPTIONS = [
   ['2y', '2 anos'],
   ['5y', '5 anos'],
   ['10y', '10 anos'],
+
 ]
+
+const CATALOG_FILTERS = [
+  ['portfolio', 'Minha carteira'],
+  ['all', 'Todos'],
+  ['stock', 'Ações'],
+  ['fii', 'FIIs'],
+  ['etf', 'ETFs'],
+  ['bdr', 'BDRs'],
+  ['unit', 'Units'],
+]
+
+function getCatalogType(item) {
+  const subtype = String(item?.subType ?? '').toLowerCase()
+  const type = String(item?.type ?? '').toLowerCase()
+
+  if (subtype === 'fii') return 'fii'
+  if (subtype === 'etf') return 'etf'
+  if (subtype === 'bdr' || type === 'bdr') return 'bdr'
+  if (subtype === 'unit') return 'unit'
+  if (type === 'stock' || subtype === 'stock') return 'stock'
+  return type || subtype || 'other'
+}
+
+function getCatalogTypeLabel(item) {
+  const type = getCatalogType(item)
+  const labels = {
+    stock: 'Ação',
+    fii: 'FII',
+    etf: 'ETF',
+    bdr: 'BDR',
+    unit: 'Unit',
+    fund: 'Fundo',
+  }
+
+  return labels[type] ?? 'Ativo B3'
+}
 
 const ASSET_PRIVACY_STORAGE_KEY =
   'financeiro:asset-analysis-values-visible'
@@ -119,25 +157,38 @@ function scoreLabel(score) {
 }
 
 function DataQuality({ analysis }) {
-  const warnings = analysis?.dataQuality?.warnings ?? []
+  const quality = analysis?.dataQuality ?? {}
+  const warnings = quality.warnings ?? []
 
   return (
     <section className="asset-data-quality">
       <span>
         Dados consultados em{' '}
-        {analysis?.dataQuality?.requestedAt
-          ? new Date(analysis.dataQuality.requestedAt).toLocaleString('pt-BR')
+        {quality.requestedAt
+          ? new Date(quality.requestedAt).toLocaleString('pt-BR')
           : '-'}
       </span>
       <span>
-        {analysis?.dataQuality?.technicalObservations ?? 0} pregoes usados na analise tecnica
+        {quality.technicalObservations ?? 0} pregões na análise técnica
+      </span>
+      <span>
+        {quality.fundamentalIndicatorsAvailable ?? 0} indicadores fundamentalistas disponíveis
+      </span>
+      <span>
+        {quality.statementYears ?? 0} anos e {quality.statementQuarters ?? 0} trimestres disponíveis
+      </span>
+      <span>
+        Cobertura da saúde: {Number(quality.healthCoverage ?? 0).toFixed(0)}%
+      </span>
+      <span className={quality.tokenConfigured ? 'positive' : 'negative'}>
+        Token da fonte: {quality.tokenConfigured ? 'configurado' : 'não configurado'}
       </span>
       {warnings.length > 0 && (
         <details>
           <summary>{warnings.length} aviso(s) da fonte de dados</summary>
           <ul>
-            {warnings.map((warning) => (
-              <li key={warning}>{warning}</li>
+            {warnings.map((warning, index) => (
+              <li key={`${index}-${warning}`}>{warning}</li>
             ))}
           </ul>
         </details>
@@ -152,40 +203,13 @@ export default function AssetAnalysisPage({
   importedPositions = [],
   setFeedback: setGlobalFeedback,
 }) {
-  const tickerOptions = useMemo(() => {
-    const values = new Map()
-
-    assets.forEach((asset) => {
-      const ticker = normalizeTicker(asset.ticker)
-      if (ticker) {
-        values.set(ticker, {
-          ticker,
-          label: `${ticker} - ${asset.asset_name || ticker}`,
-        })
-      }
-    })
-
-    importedPositions.forEach((position) => {
-      const ticker = normalizeTicker(
-        position.investment_code || position.investment_name,
-      )
-
-      if (ticker && !values.has(ticker)) {
-        values.set(ticker, {
-          ticker,
-          label: `${ticker} - ${position.investment_name || ticker}`,
-        })
-      }
-    })
-
-    return [...values.values()].sort((a, b) =>
-      a.ticker.localeCompare(b.ticker),
-    )
-  }, [assets, importedPositions])
-
-  const [ticker, setTicker] = useState(
-    tickerOptions[0]?.ticker || 'PETR4',
-  )
+  const [ticker, setTicker] = useState('PETR4')
+  const [marketAssets, setMarketAssets] = useState([])
+  const [loadingCatalog, setLoadingCatalog] = useState(true)
+  const [catalogOpen, setCatalogOpen] = useState(false)
+  const [catalogFilter, setCatalogFilter] = useState('portfolio')
+  const [catalogSearch, setCatalogSearch] = useState('')
+  const [catalogVisibleCount, setCatalogVisibleCount] = useState(80)
   const [analysis, setAnalysis] = useState(null)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -222,6 +246,112 @@ export default function AssetAnalysisPage({
     notes: '',
   })
 
+  const tickerOptions = useMemo(() => {
+    const values = new Map()
+
+    assets.forEach((asset) => {
+      const ticker = normalizeTicker(asset.ticker)
+      if (ticker) {
+        values.set(ticker, {
+          ticker,
+          label: `${ticker} - ${asset.asset_name || ticker}`,
+        })
+      }
+    })
+
+    importedPositions.forEach((position) => {
+      const ticker = normalizeTicker(
+        position.investment_code || position.investment_name,
+      )
+
+      if (ticker && !values.has(ticker)) {
+        values.set(ticker, {
+          ticker,
+          label: `${ticker} - ${position.investment_name || ticker}`,
+        })
+      }
+    })
+
+    return [...values.values()].sort((a, b) =>
+      a.ticker.localeCompare(b.ticker),
+    )
+  }, [assets, importedPositions])
+
+  const portfolioTickerSet = useMemo(
+    () => new Set(tickerOptions.map((item) => item.ticker)),
+    [tickerOptions],
+  )
+
+  const catalogAssets = useMemo(() => {
+    const values = new Map()
+
+    marketAssets.forEach((item) => {
+      const symbol = normalizeTicker(item.symbol)
+      if (!symbol) return
+
+      values.set(symbol, {
+        ...item,
+        symbol,
+        name: item.name || symbol,
+      })
+    })
+
+    tickerOptions.forEach((item) => {
+      if (!values.has(item.ticker)) {
+        values.set(item.ticker, {
+          symbol: item.ticker,
+          name: item.label.replace(`${item.ticker} - `, ''),
+          type: 'stock',
+          subType: 'stock',
+          sector: null,
+          source: 'portfolio',
+        })
+      }
+    })
+
+    return [...values.values()].sort((a, b) =>
+      a.symbol.localeCompare(b.symbol),
+    )
+  }, [marketAssets, tickerOptions])
+
+  const filteredCatalogAssets = useMemo(() => {
+    const search = catalogSearch.trim().toLowerCase()
+
+    return catalogAssets.filter((item) => {
+      if (
+        catalogFilter === 'portfolio' &&
+        !portfolioTickerSet.has(item.symbol)
+      ) {
+        return false
+      }
+
+      if (
+        !['portfolio', 'all'].includes(catalogFilter) &&
+        getCatalogType(item) !== catalogFilter
+      ) {
+        return false
+      }
+
+      if (!search) return true
+
+      return [item.symbol, item.name, item.sector, item.subsector]
+        .filter(Boolean)
+        .some((value) =>
+          String(value).toLowerCase().includes(search),
+        )
+    })
+  }, [
+    catalogAssets,
+    catalogFilter,
+    catalogSearch,
+    portfolioTickerSet,
+  ])
+
+  const selectedCatalogAsset = useMemo(
+    () => catalogAssets.find((item) => item.symbol === ticker) ?? null,
+    [catalogAssets, ticker],
+  )
+
   const selectedImportedPosition = useMemo(
     () => importedPositions.find((position) =>
       normalizeTicker(position.investment_code || position.investment_name) === ticker,
@@ -242,6 +372,57 @@ export default function AssetAnalysisPage({
     () => aggregateCostBasis(adjustments),
     [adjustments],
   )
+
+  useEffect(() => {
+    if (
+      catalogFilter === 'portfolio' &&
+      tickerOptions.length === 0
+    ) {
+      setCatalogFilter('all')
+    }
+  }, [catalogFilter, tickerOptions.length])
+
+  useEffect(() => {
+    if (
+      ticker === 'PETR4' &&
+      tickerOptions.length > 0 &&
+      !tickerOptions.some((item) => item.ticker === 'PETR4')
+    ) {
+      setTicker(tickerOptions[0].ticker)
+    }
+  }, [tickerOptions, ticker])
+
+  useEffect(() => {
+    let active = true
+
+    async function loadCatalog() {
+      setLoadingCatalog(true)
+
+      try {
+        const rows = await listMarketAssets()
+        if (active) setMarketAssets(rows)
+      } catch (error) {
+        if (active) {
+          setFeedback({
+            type: 'error',
+            message: `Falha ao carregar o catálogo da B3: ${error.message}`,
+          })
+        }
+      } finally {
+        if (active) setLoadingCatalog(false)
+      }
+    }
+
+    loadCatalog()
+
+    return () => {
+      active = false
+    }
+  }, [])
+
+  useEffect(() => {
+    setCatalogVisibleCount(80)
+  }, [catalogFilter, catalogSearch])
 
   useEffect(() => {
     try {
@@ -447,6 +628,13 @@ export default function AssetAnalysisPage({
     }
   }
 
+  function selectCatalogAsset(item) {
+    setTicker(item.symbol)
+    setCatalogOpen(false)
+    setCatalogSearch('')
+    setFeedback({ type: '', message: '' })
+  }
+
   function toggleValuesVisibility() {
     setValuesVisible((current) => {
       const next = !current
@@ -499,28 +687,105 @@ export default function AssetAnalysisPage({
           </button>
         </div>
 
-        <form className="asset-search-form" onSubmit={loadAnalysis}>
-          <label>
-            Ativo
-            <input
-              list="asset-ticker-options"
-              value={ticker}
-              onChange={(event) => setTicker(normalizeTicker(event.target.value))}
-              placeholder="PETR4"
-              required
-            />
-            <datalist id="asset-ticker-options">
-              {tickerOptions.map((item) => (
-                <option key={item.ticker} value={item.ticker}>
-                  {item.label}
-                </option>
-              ))}
-            </datalist>
-          </label>
-          <button className="primary-button" disabled={loading}>
+        <form className="asset-search-form asset-selector-form" onSubmit={loadAnalysis}>
+          <div className="asset-selected-control">
+            <span>Ativo selecionado</span>
+            <button
+              type="button"
+              className="asset-selected-button"
+              onClick={() => setCatalogOpen((current) => !current)}
+              aria-expanded={catalogOpen}
+              aria-controls="asset-market-catalog"
+            >
+              <div>
+                <strong>{ticker}</strong>
+                <small>
+                  {selectedCatalogAsset?.name || 'Selecione um ativo da B3'}
+                </small>
+              </div>
+              <span aria-hidden="true">⌄</span>
+            </button>
+          </div>
+
+          <button className="primary-button" disabled={loading || !ticker}>
             {loading ? 'Calculando...' : 'Analisar ativo'}
           </button>
         </form>
+
+        {catalogOpen && (
+          <section className="asset-catalog" id="asset-market-catalog">
+            <div className="asset-catalog-toolbar">
+              <div className="asset-catalog-filters" role="tablist" aria-label="Tipos de ativos">
+                {CATALOG_FILTERS.map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    className={catalogFilter === value ? 'active' : ''}
+                    onClick={() => setCatalogFilter(value)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              <label className="asset-catalog-search">
+                <span>Busca opcional</span>
+                <input
+                  value={catalogSearch}
+                  onChange={(event) => setCatalogSearch(event.target.value)}
+                  placeholder="Ticker, empresa ou setor"
+                />
+              </label>
+            </div>
+
+            {loadingCatalog ? (
+              <div className="asset-catalog-status">Carregando todos os ativos da B3...</div>
+            ) : filteredCatalogAssets.length === 0 ? (
+              <div className="asset-catalog-status">
+                Nenhum ativo encontrado neste filtro.
+              </div>
+            ) : (
+              <>
+                <div className="asset-catalog-grid">
+                  {filteredCatalogAssets
+                    .slice(0, catalogVisibleCount)
+                    .map((item) => (
+                      <button
+                        key={item.symbol}
+                        type="button"
+                        className={item.symbol === ticker ? 'selected' : ''}
+                        onClick={() => selectCatalogAsset(item)}
+                      >
+                        <div>
+                          <strong>{item.symbol}</strong>
+                          <span>{item.name || item.symbol}</span>
+                        </div>
+                        <small>
+                          {getCatalogTypeLabel(item)}
+                          {item.sector ? ` · ${item.sector}` : ''}
+                        </small>
+                      </button>
+                    ))}
+                </div>
+
+                {filteredCatalogAssets.length > catalogVisibleCount && (
+                  <button
+                    type="button"
+                    className="secondary-button asset-catalog-more"
+                    onClick={() => setCatalogVisibleCount((current) => current + 80)}
+                  >
+                    Mostrar mais {Math.min(80, filteredCatalogAssets.length - catalogVisibleCount)} ativos
+                  </button>
+                )}
+
+                <div className="asset-catalog-count">
+                  Exibindo {Math.min(catalogVisibleCount, filteredCatalogAssets.length)} de{' '}
+                  {filteredCatalogAssets.length} ativos.
+                </div>
+              </>
+            )}
+          </section>
+        )}
       </section>
 
       <Feedback feedback={feedback} />
@@ -744,14 +1009,43 @@ export default function AssetAnalysisPage({
                 ))}
               </div>
 
-              <div className="asset-metric-grid">
-                <div><span>Divida / patrimonio</span><strong>{metricValue(analysis.fundamentals.debtToEquity, 'multiple')}</strong></div>
+              <div className="asset-metric-grid asset-health-metric-grid">
+                <div><span>ROE</span><strong>{metricValue(analysis.fundamentals.roe, 'percent')}</strong></div>
+                <div><span>ROA</span><strong>{metricValue(analysis.fundamentals.roa, 'percent')}</strong></div>
+                <div><span>Margem EBITDA</span><strong>{metricValue(analysis.fundamentals.ebitdaMargin, 'percent')}</strong></div>
+                <div><span>Margem líquida</span><strong>{metricValue(analysis.fundamentals.netMargin, 'percent')}</strong></div>
+                <div><span>Dívida / patrimônio</span><strong>{metricValue(analysis.fundamentals.debtToEquity, 'multiple')}</strong></div>
+                <div><span>Dívida líquida / EBITDA</span><strong>{metricValue(analysis.fundamentals.netDebtToEbitda, 'multiple')}</strong></div>
+                <div><span>Cobertura de juros</span><strong>{metricValue(analysis.fundamentals.interestCoverage, 'multiple')}</strong></div>
                 <div><span>Liquidez corrente</span><strong>{metricValue(analysis.fundamentals.currentRatio)}</strong></div>
                 <div><span>Liquidez seca</span><strong>{metricValue(analysis.fundamentals.quickRatio)}</strong></div>
-                <div><span>Crescimento receita</span><strong>{metricValue(analysis.fundamentals.revenueGrowth, 'percent')}</strong></div>
-                <div><span>Crescimento lucro</span><strong>{metricValue(analysis.fundamentals.earningsGrowth, 'percent')}</strong></div>
+                <div><span>Caixa / dívida</span><strong>{metricValue(analysis.fundamentals.cashToDebt, 'multiple')}</strong></div>
+                <div><span>Crescimento da receita</span><strong>{metricValue(analysis.fundamentals.revenueGrowth, 'percent')}</strong></div>
+                <div><span>Crescimento do lucro</span><strong>{metricValue(analysis.fundamentals.earningsGrowth, 'percent')}</strong></div>
+                <div><span>CAGR receita</span><strong>{metricValue(analysis.fundamentals.revenueCagr3y, 'percent')}</strong></div>
+                <div><span>CAGR lucro</span><strong>{metricValue(analysis.fundamentals.earningsCagr3y, 'percent')}</strong></div>
+                <div><span>Anos com lucro positivo</span><strong>{metricValue(analysis.fundamentals.positiveProfitYears, 'percent')}</strong></div>
+                <div><span>Anos com caixa livre positivo</span><strong>{metricValue(analysis.fundamentals.positiveFreeCashflowYears, 'percent')}</strong></div>
                 <div><span>Fluxo de caixa livre</span><strong>{privateCurrency(analysis.fundamentals.freeCashflow, analysis.quote.currency, valuesVisible)}</strong></div>
+                <div><span>Conversão de lucro em caixa</span><strong>{metricValue(analysis.fundamentals.cashConversion, 'multiple')}</strong></div>
               </div>
+
+              <details className="asset-health-details">
+                <summary>Ver critérios usados na pontuação</summary>
+                {analysis.health.categories.map((category) => (
+                  <section key={category.label}>
+                    <h3>{category.label}</h3>
+                    <div className="asset-health-detail-list">
+                      {(category.details || []).map((detail) => (
+                        <div key={detail.label}>
+                          <span>{detail.label}</span>
+                          <strong>{scoreLabel(detail.score)}</strong>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                ))}
+              </details>
             </article>
           </section>
 

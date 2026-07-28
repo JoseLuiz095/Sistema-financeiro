@@ -26,6 +26,30 @@ async function extractFunctionError(error) {
   return error?.message || 'Falha ao consultar a analise do ativo.'
 }
 
+
+export async function listMarketAssets() {
+  const { data, error } = await supabase.functions.invoke(
+    'market-analysis',
+    {
+      body: {
+        action: 'catalog',
+      },
+    },
+  )
+
+  if (error) {
+    throw new Error(await extractFunctionError(error))
+  }
+
+  if (!data?.success) {
+    throw new Error(
+      data?.error || 'A lista de ativos não foi carregada.',
+    )
+  }
+
+  return data.assets ?? []
+}
+
 export async function getAssetAnalysis(
   ticker,
   assumptions,
