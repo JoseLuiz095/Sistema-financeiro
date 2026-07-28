@@ -773,3 +773,55 @@
     flex: 0 0 auto;
   }
 }
+
+/* Etapa 16: fallback externo e sentimento */
+.asset-external-source-warning {
+  grid-column: 1 / -1;
+  border-color: #e6c36a;
+  background: #fff9e8;
+  color: #6f5210;
+}
+
+.asset-sentiment-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.asset-sentiment-summary {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.45fr) minmax(280px, 1.55fr);
+  gap: 18px;
+  align-items: center;
+}
+
+.asset-news-list {
+  display: grid;
+  gap: 9px;
+}
+
+.asset-news-list a {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid #dce5ef;
+  border-radius: 12px;
+  color: inherit;
+  background: #f8fafc;
+  text-decoration: none;
+}
+
+.asset-news-list a:hover {
+  border-color: #8db7e2;
+  background: #f1f7fd;
+}
+
+.asset-news-list span {
+  color: #68768a;
+  font-size: 12px;
+}
+
+@media (max-width: 760px) {
+  .asset-sentiment-summary {
+    grid-template-columns: 1fr;
+  }
+}

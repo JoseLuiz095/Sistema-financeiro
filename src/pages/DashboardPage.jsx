@@ -187,7 +187,7 @@ export default function DashboardPage({
       <section className="summary-grid summary-grid-4">
         <article className="summary-card">
           <span>Receitas do mês</span>
-          <strong>
+          <strong className="personal-private-value">
             {formatCurrency(
               summary.totalIncome,
             )}
@@ -196,7 +196,7 @@ export default function DashboardPage({
 
         <article className="summary-card">
           <span>Despesas do mês</span>
-          <strong>
+          <strong className="personal-private-value">
             {formatCurrency(summary.expenses)}
           </strong>
         </article>
@@ -205,9 +205,10 @@ export default function DashboardPage({
           <span>Sobra do mês</span>
           <strong
             className={
-              summary.surplus >= 0
+              `personal-private-value ` +
+              (summary.surplus >= 0
                 ? 'positive'
-                : 'negative'
+                : 'negative')
             }
           >
             {formatCurrency(summary.surplus)}
@@ -216,7 +217,7 @@ export default function DashboardPage({
 
         <article className="summary-card">
           <span>Taxa de poupança</span>
-          <strong>
+          <strong className="personal-private-value">
             {formatPercent(
               summary.savingsRate,
             )}
@@ -238,7 +239,7 @@ export default function DashboardPage({
           <span>
             Saldo atual dos investimentos
           </span>
-          <strong>
+          <strong className="personal-private-value">
             {formatCurrency(
               investmentSummary.balance,
             )}
@@ -249,7 +250,7 @@ export default function DashboardPage({
           <span>
             Valor originalmente informado
           </span>
-          <strong>
+          <strong className="personal-private-value">
             {formatCurrency(
               investmentSummary.original,
             )}
@@ -260,9 +261,10 @@ export default function DashboardPage({
           <span>Resultado informado</span>
           <strong
             className={
-              investmentSummary.profit >= 0
+              `personal-private-value ` +
+              (investmentSummary.profit >= 0
                 ? 'positive'
-                : 'negative'
+                : 'negative')
             }
           >
             {formatCurrency(
@@ -284,7 +286,7 @@ export default function DashboardPage({
             </p>
           </div>
 
-          <div className="chart-container dashboard-chart-container">
+          <div className="chart-container dashboard-chart-container personal-private-chart">
             <ResponsiveContainer
               width="100%"
               height="100%"
@@ -370,7 +372,7 @@ export default function DashboardPage({
             </p>
           </div>
 
-          <div className="chart-container dashboard-chart-container">
+          <div className="chart-container dashboard-chart-container personal-private-chart">
             <ResponsiveContainer
               width="100%"
               height="100%"
@@ -510,13 +512,13 @@ export default function DashboardPage({
                           position.investment_subtype,
                         )}
                       </td>
-                      <td>
+                      <td><span className="personal-private-value">
                         {position.quantity == null
                           ? '-'
                           : formatNumber(
                               position.quantity,
                             )}
-                      </td>
+                      </span></td>
                       <td>
                         {position.unit_value == null
                           ? '-'
@@ -526,23 +528,24 @@ export default function DashboardPage({
                                 'BRL',
                             )}
                       </td>
-                      <td>
+                      <td><span className="personal-private-value">
                         {formatCurrency(
                           originalAmount,
                           position.currency || 'BRL',
                         )}
-                      </td>
-                      <td>
+                      </span></td>
+                      <td><span className="personal-private-value">
                         {formatCurrency(
                           currentBalance,
                           position.currency || 'BRL',
                         )}
-                      </td>
+                      </span></td>
                       <td
                         className={
-                          profit >= 0
+                          `personal-private-value ` +
+                          (profit >= 0
                             ? 'positive'
-                            : 'negative'
+                            : 'negative')
                         }
                       >
                         {formatCurrency(
@@ -601,7 +604,7 @@ export default function DashboardPage({
 
                     <div className="mobile-investment-value">
                       <span>Saldo atual</span>
-                      <strong>
+                      <strong className="personal-private-value">
                         {formatCurrency(
                           currentBalance,
                           position.currency || 'BRL',
@@ -622,7 +625,7 @@ export default function DashboardPage({
                     </div>
                     <div>
                       <span>Quantidade</span>
-                      <strong>
+                      <strong className="personal-private-value">
                         {position.quantity == null
                           ? '-'
                           : formatNumber(
@@ -644,7 +647,7 @@ export default function DashboardPage({
                     </div>
                     <div>
                       <span>Aplicado</span>
-                      <strong>
+                      <strong className="personal-private-value">
                         {formatCurrency(
                           originalAmount,
                           position.currency || 'BRL',
@@ -655,9 +658,10 @@ export default function DashboardPage({
                       <span>Resultado</span>
                       <strong
                         className={
-                          profit >= 0
+                          `personal-private-value ` +
+                          (profit >= 0
                             ? 'positive'
-                            : 'negative'
+                            : 'negative')
                         }
                       >
                         {formatCurrency(

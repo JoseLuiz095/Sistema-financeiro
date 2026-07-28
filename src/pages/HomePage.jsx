@@ -241,7 +241,14 @@ export default function HomePage({
                 <span>{item.label}</span>
               </div>
 
-              <strong className={metric.tone}>
+              <strong
+                className={
+                  `${metric.tone} ` +
+                  (item.key === 'sources'
+                    ? ''
+                    : 'personal-private-value')
+                }
+              >
                 {metric.value}
               </strong>
               <small>{metric.helper}</small>
@@ -316,7 +323,7 @@ export default function HomePage({
 
                     <strong
                       className={
-                        `transaction-value ` +
+                        `transaction-value personal-private-value ` +
                         (Number(
                           transaction.amount,
                         ) >= 0

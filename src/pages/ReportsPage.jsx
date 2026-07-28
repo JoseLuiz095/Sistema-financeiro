@@ -138,7 +138,7 @@ export default function ReportsPage({
       <section className="summary-grid summary-grid-4">
         <article className="summary-card">
           <span>Receitas e rendimentos</span>
-          <strong>
+          <strong className="personal-private-value">
             {formatCurrency(
               financialSummary.totalIncome,
             )}
@@ -147,7 +147,7 @@ export default function ReportsPage({
 
         <article className="summary-card">
           <span>Despesas</span>
-          <strong>
+          <strong className="personal-private-value">
             {formatCurrency(
               financialSummary.expenses,
             )}
@@ -158,9 +158,10 @@ export default function ReportsPage({
           <span>Sobra anual</span>
           <strong
             className={
-              financialSummary.surplus >= 0
+              `personal-private-value ` +
+              (financialSummary.surplus >= 0
                 ? 'positive'
-                : 'negative'
+                : 'negative')
             }
           >
             {formatCurrency(
@@ -171,7 +172,7 @@ export default function ReportsPage({
 
         <article className="summary-card">
           <span>Taxa de poupança</span>
-          <strong>
+          <strong className="personal-private-value">
             {formatPercent(
               financialSummary.savingsRate,
             )}

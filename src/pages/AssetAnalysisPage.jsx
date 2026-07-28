@@ -6,6 +6,7 @@ import {
   useState,
 } from 'react'
 import Feedback from '../components/Feedback'
+import usePersonalValuesVisibility from '../hooks/usePersonalValuesVisibility'
 import {
   deleteCostBasisAdjustment,
   getAssetAnalysis,
@@ -86,53 +87,30 @@ function getCatalogTypeLabel(item) {
   return labels[type] ?? 'Ativo B3'
 }
 
-const ASSET_PRIVACY_STORAGE_KEY =
-  'financeiro:asset-analysis-values-visible'
-
-function EyeIcon({ visible }) {
-  return (
-    <svg
-      aria-hidden="true"
-      fill="none"
-      height="20"
-      viewBox="0 0 24 24"
-      width="20"
-      stroke="currentColor"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth="1.8"
-    >
-      <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" />
-      <circle cx="12" cy="12" r="2.8" />
-      {!visible && <path d="m3 3 18 18" />}
-    </svg>
-  )
-}
-
 function privateCurrency(
   value,
   currency,
-  valuesVisible,
+  personalValuesVisible,
 ) {
-  return valuesVisible
+  return personalValuesVisible
     ? currencyValue(value, currency)
     : '••••••'
 }
 
 function privateNumber(
   value,
-  valuesVisible,
+  personalValuesVisible,
 ) {
-  return valuesVisible
+  return personalValuesVisible
     ? formatNumber(value)
     : '••••••'
 }
 
 function privatePercent(
   value,
-  valuesVisible,
+  personalValuesVisible,
 ) {
-  return valuesVisible
+  return personalValuesVisible
     ? formatPercent(value)
     : '••••••'
 }
@@ -162,6 +140,18 @@ function DataQuality({ analysis }) {
 
   return (
     <section className="asset-data-quality">
+      {quality.externalFallbackUsed && (
+        <div className="info-callout asset-external-source-warning">
+          Alguns dados foram buscados fora da brapi por JSON externo experimental.
+          Eles podem apresentar atraso, lacunas ou divergências em relação à bolsa,
+          à corretora e a outros portais. Confira informações críticas antes da compra.
+        </div>
+      )}
+      <span>
+        Fonte principal: {quality.externalFallbackUsed
+          ? 'JSON externo experimental com fallback automático'
+          : 'brapi'}
+      </span>
       <span>
         Dados consultados em{' '}
         {quality.requestedAt
@@ -216,17 +206,8 @@ export default function AssetAnalysisPage({
   const [historyRange, setHistoryRange] = useState('1y')
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
-  const [valuesVisible, setValuesVisible] = useState(() => {
-    try {
-      return (
-        localStorage.getItem(
-          ASSET_PRIVACY_STORAGE_KEY,
-        ) !== 'hidden'
-      )
-    } catch {
-      return true
-    }
-  })
+  const personalValuesVisible =
+    usePersonalValuesVisibility()
   const [adjustments, setAdjustments] = useState([])
   const [feedback, setFeedback] = useState({ type: '', message: '' })
   const [assumptions, setAssumptions] = useState({
@@ -413,16 +394,6 @@ export default function AssetAnalysisPage({
     setCatalogVisibleCount(80)
   }, [catalogFilter, catalogSearch])
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(
-        ASSET_PRIVACY_STORAGE_KEY,
-        valuesVisible ? 'visible' : 'hidden',
-      )
-    } catch {
-      // A preferência continua válida na sessão mesmo sem localStorage.
-    }
-  }, [valuesVisible])
 
   useEffect(() => {
     setAnalysis(null)
@@ -624,18 +595,6 @@ export default function AssetAnalysisPage({
     setFeedback({ type: '', message: '' })
   }
 
-  function toggleValuesVisibility() {
-    setValuesVisible((current) => {
-      const next = !current
-
-      if (!next) {
-        setShowHistory(false)
-      }
-
-      return next
-    })
-  }
-
   const technicalTone = getTechnicalTone(analysis?.technical?.label)
   const healthTone = getHealthTone(analysis?.health?.score)
 
@@ -651,29 +610,6 @@ export default function AssetAnalysisPage({
             </p>
           </div>
 
-          <button
-            type="button"
-            className="asset-privacy-toggle"
-            aria-pressed={!valuesVisible}
-            aria-label={
-              valuesVisible
-                ? 'Ocultar valores dos ativos'
-                : 'Mostrar valores dos ativos'
-            }
-            title={
-              valuesVisible
-                ? 'Ocultar valores dos ativos'
-                : 'Mostrar valores dos ativos'
-            }
-            onClick={toggleValuesVisibility}
-          >
-            <EyeIcon visible={valuesVisible} />
-            <span>
-              {valuesVisible
-                ? 'Ocultar valores'
-                : 'Mostrar valores'}
-            </span>
-          </button>
         </div>
 
         <form className="asset-search-form asset-selector-form" onSubmit={loadAnalysis}>
@@ -807,19 +743,15 @@ export default function AssetAnalysisPage({
             </div>
 
             <div className="asset-price-block">
-              <strong>{privateCurrency(analysis.quote.price, analysis.quote.currency, valuesVisible)}</strong>
+              <strong>{currencyValue(analysis.quote.price, analysis.quote.currency)}</strong>
               <span
                 className={
-                  valuesVisible
-                    ? analysis.quote.changePercent >= 0
-                      ? 'positive'
-                      : 'negative'
-                    : 'asset-private-neutral'
+                  analysis.quote.changePercent >= 0
+                    ? 'positive'
+                    : 'negative'
                 }
               >
-                {valuesVisible
-                  ? `${currencyValue(analysis.quote.change)} (${formatPercent(analysis.quote.changePercent)})`
-                  : '••••••'}
+                {`${currencyValue(analysis.quote.change)} (${formatPercent(analysis.quote.changePercent)})`}
               </span>
               <small>{analysis.quote.marketTime ? new Date(analysis.quote.marketTime).toLocaleString('pt-BR') : '-'}</small>
             </div>
@@ -838,12 +770,12 @@ export default function AssetAnalysisPage({
             </article>
             <article className="summary-card">
               <span>Preco justo base</span>
-              <strong>{privateCurrency(analysis.valuation.basePrice, analysis.quote.currency, valuesVisible)}</strong>
+              <strong>{currencyValue(analysis.valuation.basePrice, analysis.quote.currency)}</strong>
               <small>Confianca {Number(analysis.valuation.confidence || 0).toFixed(0)}%</small>
             </article>
             <article className="summary-card">
               <span>Comprar abaixo de</span>
-              <strong>{privateCurrency(analysis.valuation.buyBelow, analysis.quote.currency, valuesVisible)}</strong>
+              <strong>{currencyValue(analysis.valuation.buyBelow, analysis.quote.currency)}</strong>
               <small>Com margem de seguranca configurada</small>
             </article>
           </section>
@@ -854,14 +786,14 @@ export default function AssetAnalysisPage({
                 <h2>Resumo de mercado</h2>
               </div>
               <div className="asset-metric-grid">
-                <div><span>Abertura</span><strong>{privateCurrency(analysis.quote.open, analysis.quote.currency, valuesVisible)}</strong></div>
-                <div><span>Maxima do dia</span><strong>{privateCurrency(analysis.quote.dayHigh, analysis.quote.currency, valuesVisible)}</strong></div>
-                <div><span>Minima do dia</span><strong>{privateCurrency(analysis.quote.dayLow, analysis.quote.currency, valuesVisible)}</strong></div>
-                <div><span>Fechamento anterior</span><strong>{privateCurrency(analysis.quote.previousClose, analysis.quote.currency, valuesVisible)}</strong></div>
-                <div><span>Maxima 52 semanas</span><strong>{privateCurrency(analysis.quote.fiftyTwoWeekHigh, analysis.quote.currency, valuesVisible)}</strong></div>
-                <div><span>Minima 52 semanas</span><strong>{privateCurrency(analysis.quote.fiftyTwoWeekLow, analysis.quote.currency, valuesVisible)}</strong></div>
+                <div><span>Abertura</span><strong>{currencyValue(analysis.quote.open, analysis.quote.currency)}</strong></div>
+                <div><span>Maxima do dia</span><strong>{currencyValue(analysis.quote.dayHigh, analysis.quote.currency)}</strong></div>
+                <div><span>Minima do dia</span><strong>{currencyValue(analysis.quote.dayLow, analysis.quote.currency)}</strong></div>
+                <div><span>Fechamento anterior</span><strong>{currencyValue(analysis.quote.previousClose, analysis.quote.currency)}</strong></div>
+                <div><span>Maxima 52 semanas</span><strong>{currencyValue(analysis.quote.fiftyTwoWeekHigh, analysis.quote.currency)}</strong></div>
+                <div><span>Minima 52 semanas</span><strong>{currencyValue(analysis.quote.fiftyTwoWeekLow, analysis.quote.currency)}</strong></div>
                 <div><span>Volume</span><strong>{formatNumber(analysis.quote.volume)}</strong></div>
-                <div><span>Valor de mercado</span><strong>{privateCurrency(analysis.quote.marketCap, analysis.quote.currency, valuesVisible)}</strong></div>
+                <div><span>Valor de mercado</span><strong>{currencyValue(analysis.quote.marketCap, analysis.quote.currency)}</strong></div>
               </div>
             </article>
 
@@ -905,34 +837,20 @@ export default function AssetAnalysisPage({
                   type="button"
                   className="secondary-button"
                   onClick={loadHistory}
-                  disabled={loadingHistory || !valuesVisible}
-                  title={
-                    valuesVisible
-                      ? 'Carregar histórico do ativo'
-                      : 'Mostre os valores para carregar o gráfico'
-                  }
+                  disabled={loadingHistory}
+                  title="Carregar histórico do ativo"
                 >
-                  {!valuesVisible
-                    ? 'Valores ocultos'
-                    : loadingHistory
-                      ? 'Carregando grafico...'
-                      : showHistory
-                        ? 'Ocultar grafico'
-                        : 'Carregar grafico'}
+                  {loadingHistory
+                    ? 'Carregando grafico...'
+                    : showHistory
+                      ? 'Ocultar grafico'
+                      : 'Carregar grafico'}
                 </button>
               </div>
             </div>
 
-            {!valuesVisible && (
-              <div className="asset-chart-privacy-state">
-                <EyeIcon visible={false} />
-                <strong>Grafico protegido</strong>
-                <span>Mostre os valores para consultar precos e historico.</span>
-              </div>
-            )}
 
-            {valuesVisible &&
-              showHistory &&
+            {showHistory &&
               history?.series?.length > 0 && (
                 <Suspense fallback={<div className="asset-chart-loading">Preparando grafico...</div>}>
                   <AssetHistoryChart series={history.series} />
@@ -957,12 +875,12 @@ export default function AssetAnalysisPage({
                 <div><span>MACD</span><strong>{metricValue(analysis.technical.indicators.macd)}</strong></div>
                 <div><span>Histograma MACD</span><strong>{metricValue(analysis.technical.indicators.macdHistogram)}</strong></div>
                 <div><span>Estocastico 14</span><strong>{metricValue(analysis.technical.indicators.stochastic14)}</strong></div>
-                <div><span>MM21</span><strong>{privateCurrency(analysis.technical.indicators.sma21, analysis.quote.currency, valuesVisible)}</strong></div>
-                <div><span>MM50</span><strong>{privateCurrency(analysis.technical.indicators.sma50, analysis.quote.currency, valuesVisible)}</strong></div>
-                <div><span>MM200</span><strong>{privateCurrency(analysis.technical.indicators.sma200, analysis.quote.currency, valuesVisible)}</strong></div>
-                <div><span>ATR 14</span><strong>{privateCurrency(analysis.technical.indicators.atr14, analysis.quote.currency, valuesVisible)}</strong></div>
-                <div><span>Suporte 20 pregoes</span><strong>{privateCurrency(analysis.technical.indicators.support20, analysis.quote.currency, valuesVisible)}</strong></div>
-                <div><span>Resistencia 20 pregoes</span><strong>{privateCurrency(analysis.technical.indicators.resistance20, analysis.quote.currency, valuesVisible)}</strong></div>
+                <div><span>MM21</span><strong>{currencyValue(analysis.technical.indicators.sma21, analysis.quote.currency)}</strong></div>
+                <div><span>MM50</span><strong>{currencyValue(analysis.technical.indicators.sma50, analysis.quote.currency)}</strong></div>
+                <div><span>MM200</span><strong>{currencyValue(analysis.technical.indicators.sma200, analysis.quote.currency)}</strong></div>
+                <div><span>ATR 14</span><strong>{currencyValue(analysis.technical.indicators.atr14, analysis.quote.currency)}</strong></div>
+                <div><span>Suporte 20 pregoes</span><strong>{currencyValue(analysis.technical.indicators.support20, analysis.quote.currency)}</strong></div>
+                <div><span>Resistencia 20 pregoes</span><strong>{currencyValue(analysis.technical.indicators.resistance20, analysis.quote.currency)}</strong></div>
               </div>
 
               <div className="asset-signal-list">
@@ -1015,7 +933,7 @@ export default function AssetAnalysisPage({
                 <div><span>CAGR lucro</span><strong>{metricValue(analysis.fundamentals.earningsCagr3y, 'percent')}</strong></div>
                 <div><span>Anos com lucro positivo</span><strong>{metricValue(analysis.fundamentals.positiveProfitYears, 'percent')}</strong></div>
                 <div><span>Anos com caixa livre positivo</span><strong>{metricValue(analysis.fundamentals.positiveFreeCashflowYears, 'percent')}</strong></div>
-                <div><span>Fluxo de caixa livre</span><strong>{privateCurrency(analysis.fundamentals.freeCashflow, analysis.quote.currency, valuesVisible)}</strong></div>
+                <div><span>Fluxo de caixa livre</span><strong>{currencyValue(analysis.fundamentals.freeCashflow, analysis.quote.currency)}</strong></div>
                 <div><span>Conversão de lucro em caixa</span><strong>{metricValue(analysis.fundamentals.cashConversion, 'multiple')}</strong></div>
               </div>
 
@@ -1038,6 +956,61 @@ export default function AssetAnalysisPage({
             </article>
           </section>
 
+          <section className="panel asset-sentiment-panel">
+            <div className="panel-header">
+              <h2>Sentimento das notícias</h2>
+              <p>
+                Estimativa automática baseada em notícias públicas dos últimos
+                {analysis.sentiment?.periodDays ?? 30} dias.
+              </p>
+            </div>
+
+            <div className="asset-sentiment-summary">
+              <div className={`asset-score-gauge asset-score-${
+                Number(analysis.sentiment?.score ?? 0) >= 15
+                  ? 'positive'
+                  : Number(analysis.sentiment?.score ?? 0) <= -15
+                    ? 'negative'
+                    : 'neutral'
+              }`}>
+                <strong>
+                  {analysis.sentiment?.score == null
+                    ? 'Sem dados'
+                    : `${Number(analysis.sentiment.score).toFixed(0)}/100`}
+                </strong>
+                <span>{analysis.sentiment?.label ?? 'Sem dados'}</span>
+              </div>
+
+              <div className="asset-metric-grid">
+                <div><span>Notícias analisadas</span><strong>{analysis.sentiment?.articleCount ?? 0}</strong></div>
+                <div><span>Positivas</span><strong className="positive">{analysis.sentiment?.positiveArticles ?? 0}</strong></div>
+                <div><span>Neutras</span><strong>{analysis.sentiment?.neutralArticles ?? 0}</strong></div>
+                <div><span>Negativas</span><strong className="negative">{analysis.sentiment?.negativeArticles ?? 0}</strong></div>
+              </div>
+            </div>
+
+            {analysis.sentiment?.articles?.length > 0 && (
+              <div className="asset-news-list">
+                {analysis.sentiment.articles.slice(0, 6).map((article, index) => (
+                  <a
+                    key={`${article.url || article.title}-${index}`}
+                    href={article.url}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <strong>{article.title}</strong>
+                    <span>{article.domain || 'Fonte externa'}</span>
+                  </a>
+                ))}
+              </div>
+            )}
+
+            <div className="info-callout info-callout-secondary">
+              {analysis.sentiment?.disclaimer ||
+                'O sentimento é uma estimativa e não representa recomendação de compra.'}
+            </div>
+          </section>
+
           <section className="asset-analysis-grid asset-valuation-grid">
             <article className="panel">
               <div className="panel-header">
@@ -1046,9 +1019,9 @@ export default function AssetAnalysisPage({
               </div>
 
               <div className="asset-valuation-range">
-                <div><span>Conservador</span><strong>{privateCurrency(analysis.valuation.conservativePrice, analysis.quote.currency, valuesVisible)}</strong></div>
-                <div className="asset-valuation-base"><span>Base ponderada</span><strong>{privateCurrency(analysis.valuation.basePrice, analysis.quote.currency, valuesVisible)}</strong></div>
-                <div><span>Otimista</span><strong>{privateCurrency(analysis.valuation.optimisticPrice, analysis.quote.currency, valuesVisible)}</strong></div>
+                <div><span>Conservador</span><strong>{currencyValue(analysis.valuation.conservativePrice, analysis.quote.currency)}</strong></div>
+                <div className="asset-valuation-base"><span>Base ponderada</span><strong>{currencyValue(analysis.valuation.basePrice, analysis.quote.currency)}</strong></div>
+                <div><span>Otimista</span><strong>{currencyValue(analysis.valuation.optimisticPrice, analysis.quote.currency)}</strong></div>
               </div>
 
               <div className="asset-model-list">
@@ -1058,15 +1031,15 @@ export default function AssetAnalysisPage({
                       <strong>{model.label}</strong>
                       <span>{model.explanation}</span>
                     </div>
-                    <strong>{privateCurrency(model.price, analysis.quote.currency, valuesVisible)}</strong>
+                    <strong>{currencyValue(model.price, analysis.quote.currency)}</strong>
                   </article>
                 ))}
               </div>
 
               <div className="asset-valuation-summary">
-                <div><span>Preco atual</span><strong>{privateCurrency(analysis.quote.price, analysis.quote.currency, valuesVisible)}</strong></div>
-                <div><span>Potencial ate o preco base</span><strong className={valuesVisible ? analysis.valuation.upsidePercent >= 0 ? 'positive' : 'negative' : 'asset-private-neutral'}>{privatePercent(analysis.valuation.upsidePercent, valuesVisible)}</strong></div>
-                <div><span>Referencia media de analistas</span><strong>{privateCurrency(analysis.valuation.analystReference.mean, analysis.quote.currency, valuesVisible)}</strong></div>
+                <div><span>Preco atual</span><strong>{currencyValue(analysis.quote.price, analysis.quote.currency)}</strong></div>
+                <div><span>Potencial ate o preco base</span><strong className={analysis.valuation.upsidePercent >= 0 ? 'positive' : 'negative'}>{formatPercent(analysis.valuation.upsidePercent)}</strong></div>
+                <div><span>Referencia media de analistas</span><strong>{currencyValue(analysis.valuation.analystReference.mean, analysis.quote.currency)}</strong></div>
               </div>
             </article>
 
@@ -1101,25 +1074,24 @@ export default function AssetAnalysisPage({
               </div>
 
               <section className="summary-grid summary-grid-4 asset-position-summary">
-                <article className="summary-card"><span>Quantidade considerada</span><strong>{privateNumber(adjustedPosition.quantity, valuesVisible)}</strong></article>
-                <article className="summary-card"><span>Custo medio historico</span><strong>{privateCurrency(adjustedPosition.averageCost, analysis.quote.currency, valuesVisible)}</strong></article>
-                <article className="summary-card"><span>Custo total historico</span><strong>{privateCurrency(adjustedPosition.totalCost, analysis.quote.currency, valuesVisible)}</strong></article>
+                <article className="summary-card"><span>Quantidade considerada</span><strong className="personal-private-value">{privateNumber(adjustedPosition.quantity, personalValuesVisible)}</strong></article>
+                <article className="summary-card"><span>Custo medio historico</span><strong className="personal-private-value">{privateCurrency(adjustedPosition.averageCost, analysis.quote.currency, personalValuesVisible)}</strong></article>
+                <article className="summary-card"><span>Custo total historico</span><strong className="personal-private-value">{privateCurrency(adjustedPosition.totalCost, analysis.quote.currency, personalValuesVisible)}</strong></article>
                 <article className="summary-card"><span>Resultado desde a origem</span><strong
                   className={
-                    valuesVisible
-                      ? adjustedPosition.result >= 0
-                        ? 'positive'
-                        : 'negative'
-                      : 'asset-private-neutral'
+                    `personal-private-value ` +
+                    (adjustedPosition.result >= 0
+                      ? 'positive'
+                      : 'negative')
                   }
                 >
-                  {valuesVisible
-                    ? adjustedPosition.result == null
-                      ? '-'
-                      : formatCurrency(adjustedPosition.result)
-                    : '••••••'}
+                  {privateCurrency(
+                    adjustedPosition.result,
+                    analysis.quote.currency,
+                    personalValuesVisible,
+                  )}
                   <small>
-                    {valuesVisible && adjustedPosition.resultPercent != null
+                    {personalValuesVisible && adjustedPosition.resultPercent != null
                       ? formatPercent(adjustedPosition.resultPercent)
                       : ''}
                   </small>
@@ -1136,8 +1108,8 @@ export default function AssetAnalysisPage({
                 {adjustments.map((item) => (
                   <article key={item.id}>
                     <div>
-                      <strong>
-                        {valuesVisible
+                      <strong className="personal-private-value">
+                        {personalValuesVisible
                           ? `${formatNumber(item.quantity)} a ${formatCurrency(item.average_cost)}`
                           : '••••••'}
                       </strong>
@@ -1158,8 +1130,8 @@ export default function AssetAnalysisPage({
                 <div className="two-columns">
                   <label>Data-base<input type="date" value={costForm.reference_date} onChange={(event) => setCostForm({ ...costForm, reference_date: event.target.value })} required /></label>
                   <label>Tipo<select value={costForm.adjustment_type} onChange={(event) => setCostForm({ ...costForm, adjustment_type: event.target.value })}><option value="CUSTODY_TRANSFER">Transferencia de custodia</option><option value="INITIAL_POSITION">Posicao inicial</option><option value="MANUAL_CORRECTION">Correcao manual</option></select></label>
-                  <label>Quantidade<input type={valuesVisible ? 'text' : 'password'} inputMode="decimal" value={costForm.quantity} onChange={(event) => setCostForm({ ...costForm, quantity: event.target.value })} placeholder="100" required /></label>
-                  <label>Custo medio por acao<input type={valuesVisible ? 'text' : 'password'} inputMode="decimal" value={costForm.average_cost} onChange={(event) => setCostForm({ ...costForm, average_cost: event.target.value })} placeholder="32,45" required /></label>
+                  <label>Quantidade<input className="personal-private-input" type={personalValuesVisible ? 'text' : 'password'} inputMode="decimal" value={costForm.quantity} onChange={(event) => setCostForm({ ...costForm, quantity: event.target.value })} placeholder="100" required /></label>
+                  <label>Custo medio por acao<input className="personal-private-input" type={personalValuesVisible ? 'text' : 'password'} inputMode="decimal" value={costForm.average_cost} onChange={(event) => setCostForm({ ...costForm, average_cost: event.target.value })} placeholder="32,45" required /></label>
                 </div>
                 <label>Instituicao de origem<input value={costForm.institution} onChange={(event) => setCostForm({ ...costForm, institution: event.target.value })} /></label>
                 <label>Observacao<textarea value={costForm.notes} onChange={(event) => setCostForm({ ...costForm, notes: event.target.value })} placeholder="Ex.: custo medio anterior a transferencia para o Inter" /></label>
