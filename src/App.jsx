@@ -5,6 +5,7 @@ import Feedback from './components/Feedback'
 import AppIcon from './components/AppIcon'
 import { supabase } from './lib/supabase'
 import useIdleSessionGuard from './hooks/useIdleSessionGuard'
+import usePersonalValuesVisibility, { setPersonalValuesVisibility } from './hooks/usePersonalValuesVisibility'
 import AnalyticsPage from './pages/AnalyticsPage'
 import AuthPage from './pages/AuthPage'
 import DataPage from './pages/DataPage'
@@ -143,6 +144,8 @@ export default function App() {
   ] = useState([])
 
   const user = session?.user ?? null
+  const personalValuesVisible =
+    usePersonalValuesVisibility()
 
   const {
     ready: sessionGuardReady,
@@ -553,7 +556,14 @@ export default function App() {
   }
 
   return (
-    <main className="app-page">
+    <main
+      className="app-page"
+      data-personal-values-hidden={
+        personalValuesVisible
+          ? 'false'
+          : 'true'
+      }
+    >
       <header className="app-header compact-app-header">
         <div className="app-brand">
           <div
@@ -599,6 +609,41 @@ export default function App() {
               {loadingData
                 ? 'Atualizando...'
                 : 'Atualizar'}
+            </span>
+          </button>
+
+          <button
+            className="secondary-button header-action-button privacy-header-button"
+            type="button"
+            onClick={() =>
+              setPersonalValuesVisibility(
+                !personalValuesVisible,
+              )
+            }
+            aria-pressed={!personalValuesVisible}
+            aria-label={
+              personalValuesVisible
+                ? 'Ocultar valores pessoais'
+                : 'Mostrar valores pessoais'
+            }
+            title={
+              personalValuesVisible
+                ? 'Ocultar saldos, investimentos e movimentações pessoais'
+                : 'Mostrar saldos, investimentos e movimentações pessoais'
+            }
+          >
+            <AppIcon
+              name={
+                personalValuesVisible
+                  ? 'eye'
+                  : 'eyeOff'
+              }
+              size={18}
+            />
+            <span>
+              {personalValuesVisible
+                ? 'Ocultar valores'
+                : 'Mostrar valores'}
             </span>
           </button>
 

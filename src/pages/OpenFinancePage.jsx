@@ -335,7 +335,7 @@ export default function OpenFinancePage({ setFeedback, onChanged }) {
                     <div><span>Contas</span><strong>{accounts.filter((item) => item.account_type !== 'CREDIT_CARD').length}</strong></div>
                     <div><span>Cartões</span><strong>{cards.length}</strong></div>
                     <div><span>Posições</span><strong>{positions.length}</strong></div>
-                    <div><span>Saldo investido</span><strong>{formatCurrency(positionBalance)}</strong></div>
+                    <div><span>Saldo investido</span><strong className="personal-private-value">{formatCurrency(positionBalance)}</strong></div>
                     <div><span>Última sincronização</span><strong>{formatDateTime(connection.last_sync_at)}</strong></div>
                     <div><span>Modo</span><strong>Manual</strong></div>
                   </div>
@@ -422,8 +422,8 @@ export default function OpenFinancePage({ setFeedback, onChanged }) {
             <article className="summary-card"><span>Movimentos de investimento</span><strong>{lastResult.result?.investment_transactions ?? 0}</strong></article>
             <article className="summary-card"><span>Empréstimos e créditos</span><strong>{lastResult.result?.loans ?? 0}</strong></article>
             <article className="summary-card"><span>Posições com valor</span><strong>{lastResult.investment_diagnostics?.with_value ?? 0}</strong></article>
-            <article className="summary-card"><span>Saldo de investimentos recebido</span><strong>{formatCurrency(lastResult.investment_diagnostics?.net_balance_total ?? 0)}</strong></article>
-            <article className="summary-card"><span>Valor bruto recebido</span><strong>{formatCurrency(lastResult.investment_diagnostics?.gross_amount_total ?? 0)}</strong></article>
+            <article className="summary-card"><span>Saldo de investimentos recebido</span><strong className="personal-private-value">{formatCurrency(lastResult.investment_diagnostics?.net_balance_total ?? 0)}</strong></article>
+            <article className="summary-card"><span>Valor bruto recebido</span><strong className="personal-private-value">{formatCurrency(lastResult.investment_diagnostics?.gross_amount_total ?? 0)}</strong></article>
           </div>
           {lastResult.notices?.length > 0 && (
             <div className="feedback info sync-notices">
@@ -471,8 +471,8 @@ export default function OpenFinancePage({ setFeedback, onChanged }) {
                   <tr key={bill.id}>
                     <td>{bill.credit_cards?.card_name || '-'}</td>
                     <td>{formatDate(bill.due_date)}</td>
-                    <td>{formatCurrency(bill.total_amount, bill.currency || 'BRL')}</td>
-                    <td>{formatCurrency(bill.paid_amount, bill.currency || 'BRL')}</td>
+                    <td><span className="personal-private-value">{formatCurrency(bill.total_amount, bill.currency || 'BRL')}</span></td>
+                    <td><span className="personal-private-value">{formatCurrency(bill.paid_amount, bill.currency || 'BRL')}</span></td>
                     <td><span className={`status-badge status-${String(bill.status).toLowerCase()}`}>{bill.status}</span></td>
                   </tr>
                 ))}
@@ -499,7 +499,7 @@ export default function OpenFinancePage({ setFeedback, onChanged }) {
                     <td>{formatDate(transaction.transaction_date)}</td>
                     <td>{transaction.original_description}<small>{transaction.credit_cards?.card_name || '-'}</small></td>
                     <td>{transaction.installment_number && transaction.installment_total ? `${transaction.installment_number}/${transaction.installment_total}` : '-'}</td>
-                    <td>{formatCurrency(transaction.amount, transaction.currency || 'BRL')}</td>
+                    <td><span className="personal-private-value">{formatCurrency(transaction.amount, transaction.currency || 'BRL')}</span></td>
                   </tr>
                 ))}
               </tbody>
