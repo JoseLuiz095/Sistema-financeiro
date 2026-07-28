@@ -4,6 +4,7 @@ import './mobile-ui.css'
 import Feedback from './components/Feedback'
 import AppIcon from './components/AppIcon'
 import { supabase } from './lib/supabase'
+import useIdleSessionGuard from './hooks/useIdleSessionGuard'
 import AnalyticsPage from './pages/AnalyticsPage'
 import AuthPage from './pages/AuthPage'
 import DataPage from './pages/DataPage'
@@ -143,8 +144,17 @@ export default function App() {
 
   const user = session?.user ?? null
 
+  const {
+    ready: sessionGuardReady,
+  } = useIdleSessionGuard({
+    session,
+    setFeedback,
+    timeoutMs: 15 * 60 * 1000,
+  })
+
   const canLoadPrivateData = Boolean(
     user &&
+    sessionGuardReady &&
     !checkingMfa &&
     !mfaRequired,
   )
