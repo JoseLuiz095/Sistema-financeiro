@@ -12,6 +12,7 @@ import {
 import { formatCurrency, formatDate, today } from '../utils/format'
 import { getConnectionDisplayName, getInvestmentBalance } from '../utils/openFinance'
 import ConnectBankButton from '../components/ConnectBankButton'
+import DeleteConnectionButton from '../components/DeleteConnectionButton'
 
 function dateDaysAgo(days) {
   const date = new Date()
@@ -343,26 +344,62 @@ export default function OpenFinancePage({ setFeedback, onChanged }) {
                     <div className="feedback error">{connection.last_error}</div>
                   )}
 
-                  <div className="inline-actions connection-card-actions">
+                <div className="inline-actions connection-card-actions">
+                  <button
+                    type="button"
+                    className="primary-button"
+                    disabled={
+                      syncingId === connection.id ||
+                      renamingId === connection.id
+                    }
+                    onClick={() => handleSync(connection)}
+                  >
+                    {syncingId === connection.id
+                      ? 'Sincronizando...'
+                      : 'Sincronizar agora'}
+                  </button>
+
+                  {!isEditing && (
                     <button
                       type="button"
-                      className="primary-button"
-                      disabled={syncingId === connection.id || renamingId === connection.id}
-                      onClick={() => handleSync(connection)}
+                      className="secondary-button"
+                      disabled={
+                        syncingId === connection.id
+                      }
+                      onClick={() =>
+                        startRenaming(connection)
+                      }
                     >
-                      {syncingId === connection.id ? 'Sincronizando...' : 'Sincronizar agora'}
+                      Renomear conexão
                     </button>
-                    {!isEditing && (
-                      <button
-                        type="button"
-                        className="secondary-button"
-                        disabled={syncingId === connection.id}
-                        onClick={() => startRenaming(connection)}
-                      >
-                        Renomear conexão
-                      </button>
-                    )}
-                  </div>
+                  )}
+
+                  <DeleteConnectionButton
+                    connection={connection}
+                    displayName={displayName}
+                    disabled={
+                      syncingId === connection.id ||
+                      renamingId === connection.id
+                    }
+                    setFeedback={setFeedback}
+                    onDeleted={async () => {
+                      if (
+                        editingConnectionId ===
+                        connection.id
+                      ) {
+                        cancelRenaming()
+                      }
+
+                      setLastResult(null)
+
+                      await loadData()
+
+                      if (onChanged) {
+                        await onChanged()
+                      }
+                    }}
+                  />
+                </div>
                 </article>
               )
             })
