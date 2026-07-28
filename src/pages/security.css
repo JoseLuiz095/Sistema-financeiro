@@ -1,0 +1,213 @@
+.security-auth-page {
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(21, 87, 160, 0.14),
+      transparent 30rem
+    ),
+    #eef3f8;
+}
+
+.mfa-challenge-card {
+  width: min(100%, 520px);
+}
+
+.security-heading,
+.security-page .section-intro {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.security-heading h1,
+.security-page h2 {
+  margin-bottom: 6px;
+}
+
+.security-kicker {
+  display: block;
+  margin-bottom: 5px;
+  color: #1557a0;
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.security-shield {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 15px;
+  color: #ffffff;
+  background:
+    linear-gradient(145deg, #1765ba, #0c4380);
+  box-shadow:
+    0 10px 24px rgba(21, 87, 160, 0.23);
+  font-size: 22px;
+  font-weight: 900;
+}
+
+.mfa-code-input {
+  text-align: center;
+  letter-spacing: 0.34em;
+  font-size: 24px;
+  font-weight: 850;
+}
+
+.security-loading {
+  padding: 24px;
+  color: #68768a;
+  text-align: center;
+}
+
+.security-email {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 16px !important;
+}
+
+.security-factor-list {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.security-factor-card {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 14px;
+  padding: 15px;
+  border: 1px solid #dce4ee;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.security-factor-card strong,
+.security-factor-card span {
+  display: block;
+}
+
+.security-factor-card span {
+  margin-top: 4px;
+  color: #68768a;
+  font-size: 12px;
+}
+
+.security-enroll-start {
+  display: grid;
+  grid-template-columns:
+    minmax(220px, 1fr) auto;
+  align-items: end;
+  gap: 14px;
+}
+
+.security-enroll-start label {
+  display: grid;
+  gap: 7px;
+  color: #344054;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.security-enrollment {
+  display: grid;
+  grid-template-columns:
+    minmax(220px, 0.65fr)
+    minmax(300px, 1.35fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.security-qr-wrap {
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  border: 1px solid #dce4ee;
+  border-radius: 16px;
+  background: #ffffff;
+}
+
+.security-qr {
+  display: block;
+  width: min(100%, 280px);
+  height: auto;
+}
+
+.security-enrollment-copy {
+  display: grid;
+  gap: 12px;
+}
+
+.security-enrollment-copy h3 {
+  margin: 0;
+}
+
+.security-enrollment-copy p {
+  margin: 0;
+  color: #68768a;
+}
+
+.security-enrollment-copy details {
+  padding: 12px;
+  border: 1px solid #dce4ee;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.security-enrollment-copy summary {
+  cursor: pointer;
+  font-weight: 750;
+}
+
+.security-secret {
+  display: block;
+  margin-top: 10px;
+  padding: 10px;
+  overflow-wrap: anywhere;
+  border-radius: 8px;
+  background: #eef3f8;
+  font-size: 13px;
+}
+
+.security-password-form {
+  max-width: 850px;
+}
+
+.security-danger-zone {
+  border-color: #efc1c1;
+}
+
+@media (max-width: 760px) {
+  .security-heading,
+  .security-page .section-intro {
+    align-items: center;
+  }
+
+  .security-enroll-start,
+  .security-enrollment {
+    grid-template-columns: 1fr;
+  }
+
+  .security-enroll-start .primary-button {
+    width: 100%;
+  }
+
+  .security-factor-card {
+    grid-template-columns:
+      minmax(0, 1fr) auto;
+  }
+
+  .security-factor-card .danger-link {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .security-password-form .two-columns {
+    grid-template-columns: 1fr;
+  }
+}

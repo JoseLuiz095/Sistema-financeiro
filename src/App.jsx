@@ -8,6 +8,7 @@ import AnalyticsPage from './pages/AnalyticsPage'
 import AuthPage from './pages/AuthPage'
 import DataPage from './pages/DataPage'
 import HomePage from './pages/HomePage'
+import MfaChallengePage from './pages/MfaChallengePage'
 import MorePage from './pages/MorePage'
 import {
   ensureDefaultCategories,
@@ -35,21 +36,41 @@ import {
   listOpenFinanceInvestmentPositions,
   listOpenFinanceInvestmentTransactions,
 } from './services/openFinanceService'
-import { calculateInvestmentPositions } from './utils/investmentCalculator'
+import {
+  calculateInvestmentPositions,
+} from './utils/investmentCalculator'
 
 const NAV_ITEMS = [
-  { value: 'home', label: 'Início', icon: 'home' },
-  { value: 'data', label: 'Dados', icon: 'data' },
-  { value: 'analytics', label: 'Análises', icon: 'analytics' },
-  { value: 'more', label: 'Mais', icon: 'more' },
+  {
+    value: 'home',
+    label: 'Início',
+    icon: 'home',
+  },
+  {
+    value: 'data',
+    label: 'Dados',
+    icon: 'data',
+  },
+  {
+    value: 'analytics',
+    label: 'Análises',
+    icon: 'analytics',
+  },
+  {
+    value: 'more',
+    label: 'Mais',
+    icon: 'more',
+  },
 ]
 
-function LoadingPage() {
+function LoadingPage({
+  message = 'Carregando dados...',
+}) {
   return (
     <main className="loading-page">
       <div className="loading-card">
         <div className="spinner" />
-        <p>Carregando dados...</p>
+        <p>{message}</p>
       </div>
     </main>
   )
@@ -57,36 +78,93 @@ function LoadingPage() {
 
 export default function App() {
   const [session, setSession] = useState(null)
-  const [checkingSession, setCheckingSession] = useState(true)
-  const [loadingData, setLoadingData] = useState(false)
-  const [activePage, setActivePage] = useState('home')
-  const [navigationRequest, setNavigationRequest] = useState({ section: null, key: 0 })
-  const [feedback, setFeedback] = useState({ type: '', message: '' })
+  const [
+    checkingSession,
+    setCheckingSession,
+  ] = useState(true)
+  const [
+    checkingMfa,
+    setCheckingMfa,
+  ] = useState(true)
+  const [
+    mfaRequired,
+    setMfaRequired,
+  ] = useState(false)
+  const [
+    loadingData,
+    setLoadingData,
+  ] = useState(false)
+  const [
+    activePage,
+    setActivePage,
+  ] = useState('home')
+  const [
+    navigationRequest,
+    setNavigationRequest,
+  ] = useState({
+    section: null,
+    key: 0,
+  })
+  const [feedback, setFeedback] = useState({
+    type: '',
+    message: '',
+  })
 
   const [accounts, setAccounts] = useState([])
-  const [categories, setCategories] = useState([])
-  const [transactions, setTransactions] = useState([])
+  const [categories, setCategories] =
+    useState([])
+  const [transactions, setTransactions] =
+    useState([])
   const [assets, setAssets] = useState([])
-  const [operations, setOperations] = useState([])
+  const [operations, setOperations] =
+    useState([])
   const [quotes, setQuotes] = useState([])
   const [incomes, setIncomes] = useState([])
-  const [schedules, setSchedules] = useState([])
-  const [occurrences, setOccurrences] = useState([])
-  const [connections, setConnections] = useState([])
-  const [syncLogs, setSyncLogs] = useState([])
-  const [openFinanceConnections, setOpenFinanceConnections] = useState([])
-  const [importedInvestmentPositions, setImportedInvestmentPositions] = useState([])
-  const [importedInvestmentTransactions, setImportedInvestmentTransactions] = useState([])
+  const [schedules, setSchedules] =
+    useState([])
+  const [occurrences, setOccurrences] =
+    useState([])
+  const [connections, setConnections] =
+    useState([])
+  const [syncLogs, setSyncLogs] =
+    useState([])
+  const [
+    openFinanceConnections,
+    setOpenFinanceConnections,
+  ] = useState([])
+  const [
+    importedInvestmentPositions,
+    setImportedInvestmentPositions,
+  ] = useState([])
+  const [
+    importedInvestmentTransactions,
+    setImportedInvestmentTransactions,
+  ] = useState([])
 
   const user = session?.user ?? null
+
+  const canLoadPrivateData = Boolean(
+    user &&
+    !checkingMfa &&
+    !mfaRequired,
+  )
 
   useEffect(() => {
     let mounted = true
 
     async function loadSession() {
-      const { data, error } = await supabase.auth.getSession()
+      const { data, error } =
+        await supabase.auth.getSession()
+
       if (!mounted) return
-      if (error) setFeedback({ type: 'error', message: error.message })
+
+      if (error) {
+        setFeedback({
+          type: 'error',
+          message: error.message,
+        })
+      }
+
       setSession(data.session)
       setCheckingSession(false)
     }
@@ -95,10 +173,12 @@ export default function App() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession)
-      setCheckingSession(false)
-    })
+    } = supabase.auth.onAuthStateChange(
+      (_event, nextSession) => {
+        setSession(nextSession)
+        setCheckingSession(false)
+      },
+    )
 
     return () => {
       mounted = false
@@ -107,7 +187,51 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    if (!user) {
+    let active = true
+
+    async function checkMfa() {
+      if (!session) {
+        setMfaRequired(false)
+        setCheckingMfa(false)
+        return
+      }
+
+      setCheckingMfa(true)
+
+      const { data, error } =
+        await supabase.auth.mfa
+          .getAuthenticatorAssuranceLevel()
+
+      if (!active) return
+
+      if (error) {
+        setFeedback({
+          type: 'error',
+          message:
+            'Falha ao verificar a autenticação ' +
+            `em duas etapas: ${error.message}`,
+        })
+        setMfaRequired(true)
+        setCheckingMfa(false)
+        return
+      }
+
+      setMfaRequired(
+        data?.nextLevel === 'aal2' &&
+        data?.currentLevel !== 'aal2',
+      )
+      setCheckingMfa(false)
+    }
+
+    checkMfa()
+
+    return () => {
+      active = false
+    }
+  }, [session?.access_token])
+
+  useEffect(() => {
+    if (!canLoadPrivateData) {
       setAccounts([])
       setCategories([])
       setTransactions([])
@@ -124,11 +248,13 @@ export default function App() {
       setImportedInvestmentTransactions([])
       return
     }
+
     loadAllData()
-  }, [user?.id])
+  }, [user?.id, canLoadPrivateData])
 
   async function loadAllData() {
-    if (!user) return
+    if (!user || !canLoadPrivateData) return
+
     setLoadingData(true)
 
     try {
@@ -137,7 +263,14 @@ export default function App() {
       try {
         await refreshScheduledOccurrences(730)
       } catch (error) {
-        if (!String(error?.message ?? '').includes('refresh_my_scheduled_occurrences')) throw error
+        if (
+          !String(error?.message ?? '')
+            .includes(
+              'refresh_my_scheduled_occurrences',
+            )
+        ) {
+          throw error
+        }
       }
 
       const [
@@ -163,34 +296,93 @@ export default function App() {
         listInvestmentOperations(),
         listMarketQuotes(),
         listInvestmentIncome(),
-        listScheduledTransactions().catch((error) => {
-          if (String(error?.message ?? '').includes('scheduled_transactions')) return []
-          throw error
-        }),
-        listScheduledOccurrences().catch((error) => {
-          if (String(error?.message ?? '').includes('scheduled_occurrences')) return []
-          throw error
-        }),
-        listBankConnections().catch((error) => {
-          if (String(error?.message ?? '').includes('bank_connections')) return []
-          throw error
-        }),
-        listBankSyncLogs().catch((error) => {
-          if (String(error?.message ?? '').includes('bank_sync_logs')) return []
-          throw error
-        }),
-        listOpenFinanceConnections().catch((error) => {
-          if (String(error?.message ?? '').includes('open_finance_connections')) return []
-          throw error
-        }),
-        listOpenFinanceInvestmentPositions().catch((error) => {
-          if (String(error?.message ?? '').includes('open_finance_investment_positions')) return []
-          throw error
-        }),
-        listOpenFinanceInvestmentTransactions().catch((error) => {
-          if (String(error?.message ?? '').includes('open_finance_investment_transactions')) return []
-          throw error
-        }),
+        listScheduledTransactions()
+          .catch((error) => {
+            if (
+              String(error?.message ?? '')
+                .includes(
+                  'scheduled_transactions',
+                )
+            ) {
+              return []
+            }
+
+            throw error
+          }),
+        listScheduledOccurrences()
+          .catch((error) => {
+            if (
+              String(error?.message ?? '')
+                .includes(
+                  'scheduled_occurrences',
+                )
+            ) {
+              return []
+            }
+
+            throw error
+          }),
+        listBankConnections()
+          .catch((error) => {
+            if (
+              String(error?.message ?? '')
+                .includes('bank_connections')
+            ) {
+              return []
+            }
+
+            throw error
+          }),
+        listBankSyncLogs()
+          .catch((error) => {
+            if (
+              String(error?.message ?? '')
+                .includes('bank_sync_logs')
+            ) {
+              return []
+            }
+
+            throw error
+          }),
+        listOpenFinanceConnections()
+          .catch((error) => {
+            if (
+              String(error?.message ?? '')
+                .includes(
+                  'open_finance_connections',
+                )
+            ) {
+              return []
+            }
+
+            throw error
+          }),
+        listOpenFinanceInvestmentPositions()
+          .catch((error) => {
+            if (
+              String(error?.message ?? '')
+                .includes(
+                  'open_finance_investment_positions',
+                )
+            ) {
+              return []
+            }
+
+            throw error
+          }),
+        listOpenFinanceInvestmentTransactions()
+          .catch((error) => {
+            if (
+              String(error?.message ?? '')
+                .includes(
+                  'open_finance_investment_transactions',
+                )
+            ) {
+              return []
+            }
+
+            throw error
+          }),
       ])
 
       setAccounts(accountRows)
@@ -204,13 +396,21 @@ export default function App() {
       setOccurrences(occurrenceRows)
       setConnections(connectionRows)
       setSyncLogs(syncLogRows)
-      setOpenFinanceConnections(openFinanceConnectionRows)
-      setImportedInvestmentPositions(importedInvestmentPositionRows)
-      setImportedInvestmentTransactions(importedInvestmentTransactionRows)
+      setOpenFinanceConnections(
+        openFinanceConnectionRows,
+      )
+      setImportedInvestmentPositions(
+        importedInvestmentPositionRows,
+      )
+      setImportedInvestmentTransactions(
+        importedInvestmentTransactionRows,
+      )
     } catch (error) {
       setFeedback({
         type: 'error',
-        message: `Falha ao carregar os dados: ${error.message}`,
+        message:
+          `Falha ao carregar os dados: ` +
+          error.message,
       })
     } finally {
       setLoadingData(false)
@@ -218,34 +418,112 @@ export default function App() {
   }
 
   const investmentResult = useMemo(
-    () => calculateInvestmentPositions({ assets, operations, quotes, incomes }),
-    [assets, operations, quotes, incomes],
+    () =>
+      calculateInvestmentPositions({
+        assets,
+        operations,
+        quotes,
+        incomes,
+      }),
+    [
+      assets,
+      operations,
+      quotes,
+      incomes,
+    ],
   )
 
-  function navigate(page, section = null) {
+  function navigate(
+    page,
+    section = null,
+  ) {
     setActivePage(page)
-    setNavigationRequest({ section, key: Date.now() })
-    setFeedback({ type: '', message: '' })
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    setNavigationRequest({
+      section,
+      key: Date.now(),
+    })
+    setFeedback({
+      type: '',
+      message: '',
+    })
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth',
+    })
   }
 
   async function logout() {
-    const { error } = await supabase.auth.signOut()
-    if (error) setFeedback({ type: 'error', message: error.message })
+    const { error } =
+      await supabase.auth.signOut()
+
+    if (error) {
+      setFeedback({
+        type: 'error',
+        message: error.message,
+      })
+    }
   }
 
-  if (checkingSession) return <LoadingPage />
-  if (!session) return <AuthPage />
+  async function handleMfaVerified() {
+    const { data, error } =
+      await supabase.auth.getSession()
+
+    if (error) {
+      setFeedback({
+        type: 'error',
+        message: error.message,
+      })
+      return
+    }
+
+    setSession(data.session)
+    setMfaRequired(false)
+    setCheckingMfa(false)
+  }
+
+  if (checkingSession) {
+    return (
+      <LoadingPage message="Verificando sessão..." />
+    )
+  }
+
+  if (!session) {
+    return <AuthPage />
+  }
+
+  if (checkingMfa) {
+    return (
+      <LoadingPage
+        message="Verificando segurança da conta..."
+      />
+    )
+  }
+
+  if (mfaRequired) {
+    return (
+      <MfaChallengePage
+        onVerified={handleMfaVerified}
+      />
+    )
+  }
 
   return (
     <main className="app-page">
       <header className="app-header compact-app-header">
         <div className="app-brand">
-          <div className="app-brand-mark" aria-hidden="true">
-            <AppIcon name="wallet" size={24} />
+          <div
+            className="app-brand-mark"
+            aria-hidden="true"
+          >
+            <AppIcon
+              name="wallet"
+              size={24}
+            />
           </div>
           <div className="app-brand-copy">
-            <span className="app-brand-kicker">Controle financeiro</span>
+            <span className="app-brand-kicker">
+              Controle financeiro
+            </span>
             <h1>Financeiro Pessoal</h1>
             <p>{user.email}</p>
           </div>
@@ -257,59 +535,118 @@ export default function App() {
             type="button"
             onClick={loadAllData}
             disabled={loadingData}
-            aria-label={loadingData ? 'Atualizando dados' : 'Atualizar dados'}
+            aria-label={
+              loadingData
+                ? 'Atualizando dados'
+                : 'Atualizar dados'
+            }
           >
-            <AppIcon name="refresh" size={18} className={loadingData ? 'is-spinning' : ''} />
-            <span>{loadingData ? 'Atualizando...' : 'Atualizar'}</span>
+            <AppIcon
+              name="refresh"
+              size={18}
+              className={
+                loadingData
+                  ? 'is-spinning'
+                  : ''
+              }
+            />
+            <span>
+              {loadingData
+                ? 'Atualizando...'
+                : 'Atualizar'}
+            </span>
           </button>
+
           <button
             className="secondary-button header-action-button"
             type="button"
             onClick={logout}
             aria-label="Sair do sistema"
           >
-            <AppIcon name="logout" size={18} />
+            <AppIcon
+              name="logout"
+              size={18}
+            />
             <span>Sair</span>
           </button>
         </div>
       </header>
 
-      <nav className="main-nav simplified-main-nav" aria-label="Navegação principal">
-        {NAV_ITEMS.map(({ value, label, icon }) => (
-          <button
-            key={value}
-            type="button"
-            className={activePage === value ? 'active' : ''}
-            onClick={() => navigate(value)}
-            aria-current={activePage === value ? 'page' : undefined}
-          >
-            <span className="nav-icon-wrap" aria-hidden="true">
-              <AppIcon name={icon} size={20} />
-            </span>
-            <span>{label}</span>
-          </button>
-        ))}
+      <nav
+        className="main-nav simplified-main-nav"
+        aria-label="Navegação principal"
+      >
+        {NAV_ITEMS.map(
+          ({
+            value,
+            label,
+            icon,
+          }) => (
+            <button
+              key={value}
+              type="button"
+              className={
+                activePage === value
+                  ? 'active'
+                  : ''
+              }
+              onClick={() =>
+                navigate(value)
+              }
+              aria-current={
+                activePage === value
+                  ? 'page'
+                  : undefined
+              }
+            >
+              <span
+                className="nav-icon-wrap"
+                aria-hidden="true"
+              >
+                <AppIcon
+                  name={icon}
+                  size={20}
+                />
+              </span>
+              <span>{label}</span>
+            </button>
+          ),
+        )}
       </nav>
 
       <section className="app-content">
-        <div className="page-feedback"><Feedback feedback={feedback} /></div>
+        <div className="page-feedback">
+          <Feedback feedback={feedback} />
+        </div>
 
         {activePage === 'home' && (
           <HomePage
             accounts={accounts}
             transactions={transactions}
-            investmentResult={investmentResult}
-            importedInvestmentPositions={importedInvestmentPositions}
-            scheduledOccurrences={occurrences}
-            openFinanceConnections={openFinanceConnections}
+            investmentResult={
+              investmentResult
+            }
+            importedInvestmentPositions={
+              importedInvestmentPositions
+            }
+            scheduledOccurrences={
+              occurrences
+            }
+            openFinanceConnections={
+              openFinanceConnections
+            }
             onNavigate={navigate}
           />
         )}
 
         {activePage === 'data' && (
           <DataPage
-            key={`data-${navigationRequest.key}`}
-            requestedSection={navigationRequest.section}
+            key={
+              `data-${navigationRequest.key}`
+            }
+            requestedSection={
+              navigationRequest.section
+            }
             user={user}
             accounts={accounts}
             categories={categories}
@@ -320,8 +657,12 @@ export default function App() {
 
         {activePage === 'analytics' && (
           <AnalyticsPage
-            key={`analytics-${navigationRequest.key}`}
-            requestedSection={navigationRequest.section}
+            key={
+              `analytics-${navigationRequest.key}`
+            }
+            requestedSection={
+              navigationRequest.section
+            }
             user={user}
             accounts={accounts}
             transactions={transactions}
@@ -329,10 +670,18 @@ export default function App() {
             operations={operations}
             quotes={quotes}
             incomes={incomes}
-            investmentResult={investmentResult}
-            importedInvestmentPositions={importedInvestmentPositions}
-            importedInvestmentTransactions={importedInvestmentTransactions}
-            scheduledOccurrences={occurrences}
+            investmentResult={
+              investmentResult
+            }
+            importedInvestmentPositions={
+              importedInvestmentPositions
+            }
+            importedInvestmentTransactions={
+              importedInvestmentTransactions
+            }
+            scheduledOccurrences={
+              occurrences
+            }
             onChanged={loadAllData}
             setFeedback={setFeedback}
           />
@@ -340,8 +689,12 @@ export default function App() {
 
         {activePage === 'more' && (
           <MorePage
-            key={`more-${navigationRequest.key}`}
-            requestedSection={navigationRequest.section}
+            key={
+              `more-${navigationRequest.key}`
+            }
+            requestedSection={
+              navigationRequest.section
+            }
             user={user}
             accounts={accounts}
             categories={categories}
