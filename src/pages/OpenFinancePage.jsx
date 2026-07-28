@@ -210,7 +210,6 @@ export default function OpenFinancePage({ setFeedback, onChanged }) {
         <article className="summary-card">
           <span>Investimentos encontrados</span>
           <strong>{investmentPositions.length}</strong>
-          <small>{formatCurrency(investmentBalance)}</small>
         </article>
       </section>
 
