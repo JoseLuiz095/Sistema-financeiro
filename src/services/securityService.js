@@ -86,12 +86,30 @@ export async function verifyTotpFactor(
 
   if (error) throw error
 
-  const { error: refreshError } =
-    await supabase.auth.refreshSession()
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const {
+      data: aalData,
+      error: aalError,
+    } = await supabase.auth.mfa
+      .getAuthenticatorAssuranceLevel()
 
-  if (refreshError) throw refreshError
+    if (aalError) throw aalError
 
-  return data
+    if (aalData?.currentLevel === 'aal2') {
+      return {
+        ...data,
+        aal: aalData,
+      }
+    }
+
+    await new Promise((resolve) => {
+      setTimeout(resolve, 150)
+    })
+  }
+
+  throw new Error(
+    'O segundo fator foi validado, mas a sessão não chegou ao nível AAL2.',
+  )
 }
 
 export async function removeMfaFactor(

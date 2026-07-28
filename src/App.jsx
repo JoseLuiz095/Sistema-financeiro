@@ -187,6 +187,8 @@ export default function App() {
       (_event, nextSession) => {
         setSession(nextSession)
         setCheckingSession(false)
+        setCheckingMfa(Boolean(nextSession))
+        setMfaRequired(Boolean(nextSession))
       },
     )
 
@@ -475,14 +477,47 @@ export default function App() {
   }
 
   async function handleMfaVerified() {
+    setCheckingMfa(true)
+    setMfaRequired(true)
+
+    const {
+      data: aalData,
+      error: aalError,
+    } = await supabase.auth.mfa
+      .getAuthenticatorAssuranceLevel()
+
+    if (aalError) {
+      setFeedback({
+        type: 'error',
+        message:
+          'Falha ao confirmar o segundo fator: ' +
+          aalError.message,
+      })
+      setCheckingMfa(false)
+      return
+    }
+
+    if (aalData?.currentLevel !== 'aal2') {
+      setFeedback({
+        type: 'error',
+        message:
+          'A sessão ainda não foi elevada para AAL2. Tente novamente.',
+      })
+      setCheckingMfa(false)
+      return
+    }
+
     const { data, error } =
       await supabase.auth.getSession()
 
-    if (error) {
+    if (error || !data.session) {
       setFeedback({
         type: 'error',
-        message: error.message,
+        message:
+          error?.message ??
+          'A sessão autenticada não foi encontrada.',
       })
+      setCheckingMfa(false)
       return
     }
 

@@ -65,8 +65,13 @@ export default function MfaChallengePage({
     setFeedback({ type: '', message: '' })
 
     try {
-      await verifyTotpFactor(factorId, code)
-      await onVerified()
+      const verification =
+        await verifyTotpFactor(
+          factorId,
+          code,
+        )
+
+      await onVerified(verification)
     } catch (error) {
       setFeedback({
         type: 'error',
