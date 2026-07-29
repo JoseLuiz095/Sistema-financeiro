@@ -1259,3 +1259,13 @@
   color: var(--asset-muted);
   font-size: 12px;
 }
+
+/* Etapa 17/18 v3 - aviso de fontes externas complementares */
+.asset-external-source-warning small,
+.asset-ai-data-warning small {
+  display: block;
+  margin-top: 0.45rem;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  opacity: 0.86;
+}

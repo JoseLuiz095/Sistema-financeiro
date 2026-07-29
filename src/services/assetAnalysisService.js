@@ -122,11 +122,17 @@ function mergeAnalysisWithResearch(base, research, assetType) {
     .filter((source) => source.status === 'error')
     .map((source) => `${source.label}: ${source.detail}`)
   const missingFields = research.coverage?.missingFields ?? []
+  const externalFields = research.externalFields ?? []
+  const conflicts = research.conflicts ?? []
   const warnings = uniqueMessages([
     ...(base.dataQuality?.warnings ?? []),
+    research.externalWarning,
     ...sourceErrors,
+    conflicts.length > 0
+      ? `${conflicts.length} divergência(s) relevante(s) encontrada(s) entre as fontes. O sistema preservou a fonte prioritária e reduziu a confiança da análise.`
+      : null,
     research.coverage?.percent < 60
-      ? `Cobertura da pesquisa breve em ${Number(research.coverage?.percent ?? 0).toFixed(0)}%. A IA não deve emitir indicação favorável enquanto os dados críticos estiverem incompletos.`
+      ? `Cobertura efetiva da pesquisa breve em ${Number(research.coverage?.percent ?? 0).toFixed(0)}%. A IA não deve emitir indicação favorável enquanto os dados críticos estiverem incompletos.`
       : null,
     missingFields.length > 0
       ? `Campos ainda não localizados: ${missingFields.slice(0, 10).join(', ')}.`
@@ -147,10 +153,17 @@ function mergeAnalysisWithResearch(base, research, assetType) {
       warnings,
       briefResearchUsed: true,
       briefResearchCoverage: research.coverage?.percent ?? null,
+      briefResearchRawCoverage: research.coverage?.rawPercent ?? null,
       briefResearchGrade: research.coverage?.grade ?? null,
       briefResearchMissingFields: missingFields,
       briefResearchSources: research.sources ?? [],
       briefResearchRequestedAt: research.requestedAt ?? null,
+      briefResearchExternalFallbackUsed: Boolean(research.externalFallbackUsed),
+      briefResearchExternalFields: externalFields,
+      briefResearchExternalSourceLabels: research.externalSourceLabels ?? [],
+      briefResearchSourceReliability: research.sourceReliabilityPercent ?? null,
+      briefResearchConflicts: conflicts,
+      briefResearchExternalWarning: research.externalWarning ?? null,
     },
   }
 }

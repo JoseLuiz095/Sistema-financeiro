@@ -62,8 +62,8 @@ export default function AssetAiAnalysisPanel({
             <span className="eyebrow">Pesquisa breve sob demanda</span>
             <h2>Análise da carteira com IA</h2>
             <p>
-              Cruza a análise atual, dados públicos recentes e a proporção do ativo
-              na sua carteira. Nenhum resultado desta pesquisa é gravado no banco.
+              Cruza a análise atual, múltiplas fontes públicas recentes e a proporção
+              do ativo na sua carteira. Nenhum resultado desta pesquisa é gravado no banco.
             </p>
           </div>
         </div>
@@ -212,6 +212,23 @@ export default function AssetAiAnalysisPanel({
             </div>
           )}
 
+          {research?.externalFallbackUsed && (
+            <div className="info-callout asset-ai-data-warning">
+              {research.externalWarning || (
+                'Parte dos dados foi preenchida por fontes externas complementares. '
+                + 'Essas informações podem ter atraso, metodologia diferente ou '
+                + 'divergência entre provedores e podem ser menos assertivas. '
+                + 'Confirme dados críticos antes de investir.'
+              )}
+              {research.externalSourceLabels?.length > 0 && (
+                <small>
+                  Fontes complementares usadas: {' '}
+                  {research.externalSourceLabels.join(', ')}.
+                </small>
+              )}
+            </div>
+          )}
+
           {research?.coverage && !research.coverage.recommendationAllowed && (
             <div className="info-callout asset-ai-data-warning">
               A cobertura atual não permite uma indicação favorável. A IA foi
@@ -318,7 +335,11 @@ export default function AssetAiAnalysisPanel({
                       <span>{source.detail}</span>
                     </div>
                     <span className={source.status === 'ok' ? 'positive' : 'negative'}>
-                      {source.status === 'ok' ? 'Consultada' : 'Indisponível'}
+                      {source.status === 'ok'
+                        ? 'Consultada'
+                        : source.status === 'skipped'
+                          ? 'Não configurada'
+                          : 'Indisponível'}
                     </span>
                   </article>
                 ))}

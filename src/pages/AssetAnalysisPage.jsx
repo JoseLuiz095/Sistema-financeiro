@@ -185,6 +185,22 @@ function DataQuality({ analysis }) {
           à corretora e a outros portais. Confira informações críticas antes da compra.
         </div>
       )}
+      {quality.briefResearchExternalFallbackUsed && (
+        <div className="info-callout asset-external-source-warning">
+          {quality.briefResearchExternalWarning || (
+            'Parte dos dados foi preenchida por fontes externas complementares. '
+            + 'Essas informações podem ter atraso, metodologia diferente ou divergência '
+            + 'entre provedores e, por isso, podem ser menos assertivas. Confirme os '
+            + 'dados críticos antes de investir.'
+          )}
+          {quality.briefResearchExternalSourceLabels?.length > 0 && (
+            <small>
+              Fontes complementares usadas: {' '}
+              {quality.briefResearchExternalSourceLabels.join(', ')}.
+            </small>
+          )}
+        </div>
+      )}
       <span>
         Fonte principal: {quality.externalFallbackUsed
           ? 'JSON externo experimental com fallback automático'
@@ -215,6 +231,18 @@ function DataQuality({ analysis }) {
           {quality.briefResearchGrade
             ? ` · ${quality.briefResearchGrade}`
             : ''}
+        </span>
+      )}
+      {Number.isFinite(Number(quality.briefResearchSourceReliability)) && (
+        <span>
+          Confiabilidade média das fontes usadas:{' '}
+          {Number(quality.briefResearchSourceReliability).toFixed(0)}%
+        </span>
+      )}
+      {quality.briefResearchExternalFields?.length > 0 && (
+        <span>
+          {quality.briefResearchExternalFields.length} campo(s) complementado(s)
+          fora da fonte principal
         </span>
       )}
       <span className={quality.tokenConfigured ? 'positive' : 'negative'}>
