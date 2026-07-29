@@ -3,6 +3,11 @@ import { supabase } from '../lib/supabase'
 import Feedback from '../components/Feedback'
 
 export default function AuthPage() {
+    const productionUrl = String(
+    import.meta.env.VITE_APP_URL ||
+      'https://sistema-financeiro-8w1.pages.dev',
+  ).replace(/\/+$/, '')
+
   const signupEnabled =
     String(import.meta.env.VITE_ALLOW_SIGNUP ?? 'true') !== 'false'
 
@@ -61,7 +66,7 @@ export default function AuthPage() {
           email: normalizedEmail,
           password,
           options: {
-            emailRedirectTo: window.location.origin,
+            emailRedirectTo: `${productionUrl}/`,
             data: {
               display_name: name.trim(),
               onboarding_source: 'SELF_SERVICE',
