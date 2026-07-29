@@ -40,7 +40,7 @@ function getStatusLabel(status) {
   return labels[status] ?? status ?? '-'
 }
 
-export default function OpenFinancePage({ setFeedback, onChanged }) {
+export default function OpenFinancePage({ user, setFeedback, onChanged }) {
   const [connections, setConnections] = useState([])
   const [logs, setLogs] = useState([])
   const [bills, setBills] = useState([])
@@ -213,31 +213,66 @@ export default function OpenFinancePage({ setFeedback, onChanged }) {
         </article>
       </section>
 
-      <section className="panel">
-        <div className="panel-header">
-          <h2>Open Finance</h2>
-          <p>
-            Conecte uma instituição e atualize os dados manualmente quando necessário.
-          </p>
+      <section className="panel open-finance-user-panel">
+        <div className="open-finance-user-header">
+          <div className="panel-header">
+            <span className="eyebrow">Espaço bancário individual</span>
+            <h2>Meu Open Finance</h2>
+            <p>
+              Conecte seus bancos pelo fluxo incorporado da Pluggy. Cada Item criado fica vinculado exclusivamente ao usuário autenticado.
+            </p>
+          </div>
+
+          <div className="open-finance-user-chip">
+            <span>Usuário atual</span>
+            <strong>{user?.email ?? '-'}</strong>
+            <small>{connections.length} conexão(ões) vinculada(s)</small>
+          </div>
+        </div>
+
+        <div className="open-finance-onboarding-grid">
+          <article>
+            <span>1</span>
+            <div>
+              <strong>Escolha a instituição</strong>
+              <small>O Pluggy Connect abre dentro do sistema.</small>
+            </div>
+          </article>
+          <article>
+            <span>2</span>
+            <div>
+              <strong>Autorize seus dados</strong>
+              <small>O banco pode abrir a janela oficial ou o aplicativo para consentimento.</small>
+            </div>
+          </article>
+          <article>
+            <span>3</span>
+            <div>
+              <strong>Sincronize</strong>
+              <small>Contas, cartões, investimentos e dívidas ficam disponíveis somente nesta conta.</small>
+            </div>
+          </article>
         </div>
 
         <div className="info-callout">
-          A leitura manual não movimenta dinheiro e não inicia pagamentos. As credenciais da Pluggy continuam protegidas nos Secrets da Edge Function.
+          A leitura não movimenta dinheiro e não inicia pagamentos. O Client ID e o Client Secret da Pluggy permanecem somente nos Secrets das Edge Functions.
         </div>
 
         <div className="info-callout info-callout-secondary">
-          No Meu Pluggy, cada banco conectado precisa ser autorizado separadamente no seu site. Ao adicionar o Inter, clique novamente em “Conectar instituição”, escolha Meu Pluggy e autorize a conexão do Inter.
+          Você não precisa criar credenciais da API Pluggy para cada usuário. O sistema usa uma aplicação Pluggy central, mas identifica cada conexão pelo usuário do Supabase e aplica isolamento por RLS.
         </div>
 
-        <div className="inline-actions">
+        <div className="inline-actions open-finance-primary-actions">
           <ConnectBankButton
             setFeedback={setFeedback}
-            onConnected={async () => {
-              await loadData()
-
-              if (onChanged) {
-                await onChanged()
+            onConnected={async (savedConnection, context) => {
+              if (context?.shouldSync) {
+                await handleSync(savedConnection)
+                return
               }
+
+              await loadData()
+              if (onChanged) await onChanged()
             }}
           />
         </div>
@@ -336,7 +371,7 @@ export default function OpenFinancePage({ setFeedback, onChanged }) {
                     <div><span>Posições</span><strong>{positions.length}</strong></div>
                     <div><span>Saldo investido</span><strong className="personal-private-value">{formatCurrency(positionBalance)}</strong></div>
                     <div><span>Última sincronização</span><strong>{formatDateTime(connection.last_sync_at)}</strong></div>
-                    <div><span>Modo</span><strong>Manual</strong></div>
+                    <div><span>Vínculo</span><strong>{connection.metadata?.isolated_by_user ? 'Usuário atual' : 'Conexão anterior'}</strong></div>
                   </div>
 
                   {connection.last_error && (
@@ -357,6 +392,25 @@ export default function OpenFinancePage({ setFeedback, onChanged }) {
                       ? 'Sincronizando...'
                       : 'Sincronizar agora'}
                   </button>
+
+                  <ConnectBankButton
+                    connection={connection}
+                    className="secondary-button"
+                    disabled={
+                      syncingId === connection.id ||
+                      renamingId === connection.id
+                    }
+                    setFeedback={setFeedback}
+                    onConnected={async (savedConnection, context) => {
+                      if (context?.shouldSync) {
+                        await handleSync(savedConnection)
+                        return
+                      }
+
+                      await loadData()
+                      if (onChanged) await onChanged()
+                    }}
+                  />
 
                   {!isEditing && (
                     <button

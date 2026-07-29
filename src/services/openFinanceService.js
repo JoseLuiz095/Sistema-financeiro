@@ -294,13 +294,14 @@ export async function renameOpenFinanceConnection(connection, displayName) {
   return data
 }
 
-export async function createPluggyConnectToken() {
+export async function createPluggyConnectToken({ itemId } = {}) {
   const { data, error } =
     await supabase.functions.invoke(
       'pluggy-connect',
       {
         body: {
           action: 'create-token',
+          ...(itemId ? { itemId } : {}),
         },
       },
     )

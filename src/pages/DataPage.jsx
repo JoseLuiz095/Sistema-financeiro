@@ -61,7 +61,7 @@ export default function DataPage({
           <span aria-hidden="true">←</span>
           Voltar para dados
         </button>
-        <OpenFinancePage setFeedback={setFeedback} onChanged={onChanged} />
+        <OpenFinancePage user={user} setFeedback={setFeedback} onChanged={onChanged} />
       </div>
     )
   }

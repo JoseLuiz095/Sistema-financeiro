@@ -1934,3 +1934,137 @@ body {
     height: 330px;
   }
 }
+
+/* =========================================================
+   MULTIUSUARIO + PLUGGY INCORPORADO
+   ========================================================= */
+.auth-card-multi-user {
+  width: min(100%, 540px);
+}
+
+.auth-isolation-callout {
+  margin-bottom: 22px;
+}
+
+.auth-security-note {
+  margin: 18px 0 0;
+  color: #69778b;
+  font-size: 13px;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.open-finance-user-panel {
+  overflow: hidden;
+  position: relative;
+}
+
+.open-finance-user-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 4px;
+  background: linear-gradient(90deg, #1456a0, #2e85d3, #5fc0d8);
+}
+
+.open-finance-user-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.open-finance-user-chip {
+  min-width: 250px;
+  display: grid;
+  gap: 5px;
+  padding: 14px 16px;
+  border: 1px solid #dbe7f4;
+  border-radius: 14px;
+  background: #f6f9fd;
+}
+
+.open-finance-user-chip span,
+.open-finance-user-chip small {
+  color: #69778b;
+  font-size: 12px;
+}
+
+.open-finance-user-chip strong {
+  color: #26384f;
+  overflow-wrap: anywhere;
+}
+
+.open-finance-onboarding-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 20px 0;
+}
+
+.open-finance-onboarding-grid article {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #e0e8f1;
+  border-radius: 13px;
+  background: #fbfcfe;
+}
+
+.open-finance-onboarding-grid article > span {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #ffffff;
+  background: #1456a0;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.open-finance-onboarding-grid article div {
+  display: grid;
+  gap: 4px;
+}
+
+.open-finance-onboarding-grid strong {
+  color: #26384f;
+  font-size: 14px;
+}
+
+.open-finance-onboarding-grid small {
+  color: #69778b;
+  line-height: 1.45;
+}
+
+.open-finance-primary-actions {
+  margin-top: 18px;
+}
+
+.connect-bank-inline-status {
+  align-self: center;
+  color: #52647a;
+  font-size: 13px;
+}
+
+.connection-card-actions {
+  align-items: center;
+}
+
+@media (max-width: 900px) {
+  .open-finance-user-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .open-finance-user-chip {
+    min-width: 0;
+  }
+
+  .open-finance-onboarding-grid {
+    grid-template-columns: 1fr;
+  }
+}
