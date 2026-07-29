@@ -55,7 +55,11 @@ export default function useIdleSessionGuard({
 }) {
   const [ready, setReady] = useState(!session)
   const [authorized, setAuthorized] =
-    useState(!session)
+    useState(false)
+  const [
+    authorizedSessionId,
+    setAuthorizedSessionId,
+  ] = useState(null)
 
   const expiringRef = useRef(false)
   const initializedRef = useRef(false)
@@ -64,6 +68,8 @@ export default function useIdleSessionGuard({
   const activityDirtyRef = useRef(false)
   const guardTokenRef = useRef(null)
   const channelRef = useRef(null)
+
+  const hasSession = Boolean(session)
 
   const sessionId = useMemo(() => {
     const payload = decodeJwtPayload(
@@ -88,13 +94,14 @@ export default function useIdleSessionGuard({
 
   useEffect(() => {
     if (
-      !session ||
+      !hasSession ||
       !userId ||
       !sessionId ||
       !storageKeys
     ) {
       setReady(true)
       setAuthorized(false)
+      setAuthorizedSessionId(null)
       return undefined
     }
 
@@ -103,6 +110,7 @@ export default function useIdleSessionGuard({
 
     setReady(false)
     setAuthorized(false)
+    setAuthorizedSessionId(null)
     expiringRef.current = false
     initializedRef.current = false
     guardTokenRef.current =
@@ -140,6 +148,7 @@ export default function useIdleSessionGuard({
 
       expiringRef.current = true
       setAuthorized(false)
+      setAuthorizedSessionId(null)
 
       const message =
         reason === 'idle_timeout'
@@ -241,6 +250,7 @@ export default function useIdleSessionGuard({
 
         initializedRef.current = true
         setAuthorized(true)
+        setAuthorizedSessionId(sessionId)
         setReady(true)
       } catch (error) {
         if (!initializedRef.current) {
@@ -472,7 +482,7 @@ export default function useIdleSessionGuard({
       channelRef.current = null
     }
   }, [
-    session,
+    hasSession,
     userId,
     sessionId,
     storageKeys,
@@ -483,5 +493,7 @@ export default function useIdleSessionGuard({
   return {
     ready,
     authorized,
+    sessionId,
+    authorizedSessionId,
   }
 }

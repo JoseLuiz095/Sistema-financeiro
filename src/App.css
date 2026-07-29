@@ -2068,3 +2068,90 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+/* =========================================================
+   CONFIRMACAO DE CADASTRO POR CODIGO
+   ========================================================= */
+.auth-verification-card {
+  overflow: hidden;
+  position: relative;
+}
+
+.auth-verification-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 4px;
+  background: linear-gradient(90deg, #1456a0, #2e85d3, #5fc0d8);
+}
+
+.auth-step-kicker {
+  display: block;
+  margin-bottom: 5px;
+  color: #1557a0;
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.auth-verification-email {
+  display: grid;
+  gap: 5px;
+  margin: 20px 0;
+  padding: 14px 16px;
+  border: 1px solid #dbe7f4;
+  border-radius: 14px;
+  background: #f6f9fd;
+}
+
+.auth-verification-email span {
+  color: #69778b;
+  font-size: 12px;
+}
+
+.auth-verification-email strong {
+  overflow-wrap: anywhere;
+  color: #26384f;
+}
+
+.signup-code-input {
+  min-height: 58px;
+  text-align: center;
+  letter-spacing: 0.3em;
+  font-size: 24px;
+  font-weight: 850;
+  font-variant-numeric: tabular-nums;
+}
+
+.auth-verification-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.auth-text-button {
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  color: #1557a0;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.auth-text-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+@media (max-width: 560px) {
+  .auth-verification-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .signup-code-input {
+    font-size: 21px;
+  }
+}

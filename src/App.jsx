@@ -186,17 +186,32 @@ export default function App() {
   const personalValuesVisible =
     usePersonalValuesVisibility()
 
+  const guardSession =
+    session &&
+    !checkingSession &&
+    !checkingMfa &&
+    !mfaRequired
+      ? session
+      : null
+
   const {
     ready: sessionGuardReady,
+    authorized: sessionGuardAuthorized,
+    sessionId: sessionGuardSessionId,
+    authorizedSessionId,
   } = useIdleSessionGuard({
-    session,
+    session: guardSession,
     setFeedback,
     timeoutMs: 15 * 60 * 1000,
   })
 
   const canLoadPrivateData = Boolean(
     user &&
+    guardSession &&
     sessionGuardReady &&
+    sessionGuardAuthorized &&
+    sessionGuardSessionId &&
+    authorizedSessionId === sessionGuardSessionId &&
     !checkingMfa &&
     !mfaRequired,
   )
@@ -226,11 +241,24 @@ export default function App() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(
-      (_event, nextSession) => {
+      (event, nextSession) => {
         setSession(nextSession)
         setCheckingSession(false)
-        setCheckingMfa(Boolean(nextSession))
-        setMfaRequired(Boolean(nextSession))
+
+        if (!nextSession || event === 'SIGNED_OUT') {
+          setCheckingMfa(false)
+          setMfaRequired(false)
+          setPrivateDataReady(false)
+          return
+        }
+
+        if (
+          event === 'SIGNED_IN' ||
+          event === 'USER_UPDATED'
+        ) {
+          setPrivateDataReady(false)
+          setCheckingMfa(true)
+        }
       },
     )
 
@@ -250,7 +278,12 @@ export default function App() {
         return
       }
 
-      setCheckingMfa(true)
+      const shouldBlockInterface =
+        !privateDataReady
+
+      if (shouldBlockInterface) {
+        setCheckingMfa(true)
+      }
 
       const { data, error } =
         await supabase.auth.mfa
@@ -510,7 +543,9 @@ export default function App() {
 
   async function logout() {
     const { error } =
-      await supabase.auth.signOut()
+      await supabase.auth.signOut({
+        scope: 'local',
+      })
 
     if (error) {
       setFeedback({

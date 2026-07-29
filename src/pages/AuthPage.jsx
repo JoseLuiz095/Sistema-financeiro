@@ -1,28 +1,76 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import Feedback from '../components/Feedback'
 
-export default function AuthPage() {
-    const productionUrl = String(
-    import.meta.env.VITE_APP_URL ||
-      'https://sistema-financeiro-8w1.pages.dev',
-  ).replace(/\/+$/, '')
+const PENDING_SIGNUP_EMAIL_KEY =
+  'financeiro:pending-signup-email'
+const RESEND_COOLDOWN_SECONDS = 60
 
+function normalizeOtp(value) {
+  return String(value ?? '')
+    .replace(/\D/g, '')
+    .slice(0, 8)
+}
+
+function getApplicationUrl() {
+  return String(
+    import.meta.env.VITE_APP_URL ||
+      window.location.origin,
+  ).replace(/\/+$/, '')
+}
+
+export default function AuthPage() {
   const signupEnabled =
     String(import.meta.env.VITE_ALLOW_SIGNUP ?? 'true') !== 'false'
 
-  const [mode, setMode] = useState('LOGIN')
+  const storedPendingEmail =
+    sessionStorage.getItem(PENDING_SIGNUP_EMAIL_KEY) ?? ''
+
+  const [mode, setMode] = useState(
+    storedPendingEmail ? 'VERIFY_SIGNUP' : 'LOGIN',
+  )
   const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(storedPendingEmail)
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [verificationCode, setVerificationCode] = useState('')
   const [loading, setLoading] = useState(false)
+  const [resending, setResending] = useState(false)
+  const [resendCooldown, setResendCooldown] = useState(0)
   const [feedback, setFeedback] = useState({
     type: '',
     message: '',
   })
 
   const isSignup = mode === 'SIGNUP'
+  const isVerification = mode === 'VERIFY_SIGNUP'
+  const applicationUrl = useMemo(() => getApplicationUrl(), [])
+
+  useEffect(() => {
+    const logoutMessage = sessionStorage.getItem(
+      'financeiro:logout-message',
+    )
+
+    if (!logoutMessage) return
+
+    sessionStorage.removeItem('financeiro:logout-message')
+    setFeedback({
+      type: 'info',
+      message: logoutMessage,
+    })
+  }, [])
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return undefined
+
+    const timerId = window.setInterval(() => {
+      setResendCooldown((current) =>
+        current > 0 ? current - 1 : 0,
+      )
+    }, 1000)
+
+    return () => window.clearInterval(timerId)
+  }, [resendCooldown])
 
   const submitLabel = useMemo(() => {
     if (loading) {
@@ -37,6 +85,28 @@ export default function AuthPage() {
     setFeedback({ type: '', message: '' })
     setPassword('')
     setConfirmPassword('')
+    setVerificationCode('')
+  }
+
+  function openVerification(emailAddress) {
+    const normalizedEmail = emailAddress.trim().toLowerCase()
+
+    sessionStorage.setItem(
+      PENDING_SIGNUP_EMAIL_KEY,
+      normalizedEmail,
+    )
+    setEmail(normalizedEmail)
+    setVerificationCode('')
+    setResendCooldown(RESEND_COOLDOWN_SECONDS)
+    setMode('VERIFY_SIGNUP')
+  }
+
+  function closeVerification(nextMode = 'LOGIN') {
+    sessionStorage.removeItem(PENDING_SIGNUP_EMAIL_KEY)
+    setVerificationCode('')
+    setResendCooldown(0)
+    setMode(nextMode)
+    setFeedback({ type: '', message: '' })
   }
 
   async function submit(event) {
@@ -66,7 +136,7 @@ export default function AuthPage() {
           email: normalizedEmail,
           password,
           options: {
-            emailRedirectTo: `${productionUrl}/`,
+            emailRedirectTo: `${applicationUrl}/`,
             data: {
               display_name: name.trim(),
               onboarding_source: 'SELF_SERVICE',
@@ -77,6 +147,7 @@ export default function AuthPage() {
         if (error) throw error
 
         if (data?.session) {
+          sessionStorage.removeItem(PENDING_SIGNUP_EMAIL_KEY)
           setFeedback({
             type: 'success',
             message:
@@ -85,15 +156,14 @@ export default function AuthPage() {
           return
         }
 
+        setPassword('')
+        setConfirmPassword('')
+        openVerification(normalizedEmail)
         setFeedback({
           type: 'success',
           message:
-            'Conta criada. Confirme o e-mail enviado pelo Supabase e depois entre no sistema.',
+            'Enviamos um código de confirmação para o seu e-mail. Digite-o nesta mesma tela para continuar neste dispositivo.',
         })
-
-        setMode('LOGIN')
-        setPassword('')
-        setConfirmPassword('')
         return
       }
 
@@ -111,6 +181,195 @@ export default function AuthPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  async function verifySignup(event) {
+    event.preventDefault()
+    setLoading(true)
+    setFeedback({ type: '', message: '' })
+
+    try {
+      const normalizedEmail = email.trim().toLowerCase()
+      const token = normalizeOtp(verificationCode)
+
+      if (!normalizedEmail) {
+        throw new Error(
+          'O e-mail pendente de confirmação não foi encontrado.',
+        )
+      }
+
+      if (token.length < 6) {
+        throw new Error(
+          'Informe o código de confirmação recebido por e-mail.',
+        )
+      }
+
+      const { data, error } = await supabase.auth.verifyOtp({
+        email: normalizedEmail,
+        token,
+        type: 'email',
+      })
+
+      if (error) throw error
+
+      sessionStorage.removeItem(PENDING_SIGNUP_EMAIL_KEY)
+      setVerificationCode('')
+
+      if (data?.session) {
+        setFeedback({
+          type: 'success',
+          message:
+            'E-mail confirmado. Preparando o seu painel financeiro...',
+        })
+        return
+      }
+
+      setMode('LOGIN')
+      setFeedback({
+        type: 'success',
+        message:
+          'E-mail confirmado. Entre com a senha cadastrada.',
+      })
+    } catch (error) {
+      setFeedback({
+        type: 'error',
+        message: error.message,
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function resendSignupCode() {
+    if (resending || resendCooldown > 0) return
+
+    setResending(true)
+    setFeedback({ type: '', message: '' })
+
+    try {
+      const normalizedEmail = email.trim().toLowerCase()
+
+      if (!normalizedEmail) {
+        throw new Error(
+          'O e-mail pendente de confirmação não foi encontrado.',
+        )
+      }
+
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: normalizedEmail,
+        options: {
+          emailRedirectTo: `${applicationUrl}/`,
+        },
+      })
+
+      if (error) throw error
+
+      setResendCooldown(RESEND_COOLDOWN_SECONDS)
+      setFeedback({
+        type: 'success',
+        message:
+          'Um novo código foi enviado. Use sempre o código mais recente.',
+      })
+    } catch (error) {
+      setFeedback({
+        type: 'error',
+        message: error.message,
+      })
+    } finally {
+      setResending(false)
+    }
+  }
+
+  if (isVerification) {
+    return (
+      <main className="auth-page">
+        <section className="auth-card auth-card-multi-user auth-verification-card">
+          <div className="brand">
+            <div className="brand-icon">F</div>
+            <div>
+              <span className="auth-step-kicker">
+                Confirmação de cadastro
+              </span>
+              <h1>Digite o código do e-mail</h1>
+              <p>
+                Você continua na página em que iniciou o cadastro. Abra o e-mail em qualquer dispositivo e informe o código abaixo.
+              </p>
+            </div>
+          </div>
+
+          <div className="auth-verification-email">
+            <span>Código enviado para</span>
+            <strong>{email}</strong>
+          </div>
+
+          <form className="form" onSubmit={verifySignup}>
+            <label>
+              Código de confirmação
+              <input
+                className="signup-code-input"
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                pattern="[0-9]*"
+                minLength={6}
+                maxLength={8}
+                value={verificationCode}
+                onChange={(event) =>
+                  setVerificationCode(
+                    normalizeOtp(event.target.value),
+                  )
+                }
+                placeholder="000000"
+                required
+                autoFocus
+              />
+            </label>
+
+            <Feedback feedback={feedback} />
+
+            <button
+              className="primary-button"
+              disabled={loading}
+            >
+              {loading ? 'Confirmando...' : 'Confirmar e continuar'}
+            </button>
+          </form>
+
+          <div className="auth-verification-actions">
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={resendSignupCode}
+              disabled={
+                resending ||
+                resendCooldown > 0 ||
+                loading
+              }
+            >
+              {resending
+                ? 'Reenviando...'
+                : resendCooldown > 0
+                  ? `Reenviar em ${resendCooldown}s`
+                  : 'Reenviar código'}
+            </button>
+
+            <button
+              className="text-button auth-text-button"
+              type="button"
+              onClick={() => closeVerification('SIGNUP')}
+              disabled={loading || resending}
+            >
+              Alterar e-mail ou cadastro
+            </button>
+          </div>
+
+          <p className="auth-security-note">
+            Não é necessário abrir um link de acesso no celular. Apenas copie o código recebido e conclua a confirmação nesta página.
+          </p>
+        </section>
+      </main>
+    )
   }
 
   return (
@@ -217,7 +476,7 @@ export default function AuthPage() {
 
         {isSignup && (
           <p className="auth-security-note">
-            Depois de entrar, conecte seus bancos pelo Pluggy Connect dentro do próprio sistema. As credenciais da aplicação permanecem apenas nas Edge Functions.
+            Depois de criar a conta, você receberá um código por e-mail e concluirá a confirmação nesta mesma tela.
           </p>
         )}
       </section>

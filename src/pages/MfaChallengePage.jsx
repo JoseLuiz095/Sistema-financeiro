@@ -83,7 +83,9 @@ export default function MfaChallengePage({
   }
 
   async function logout() {
-    await supabase.auth.signOut()
+    await supabase.auth.signOut({
+      scope: 'local',
+    })
   }
 
   return (
