@@ -1,4 +1,5 @@
 import AppIcon from './AppIcon'
+import { AnimatePresence, m } from './AppMotion'
 import {
   formatCurrency,
   formatPercent,
@@ -27,6 +28,12 @@ function scoreValue(value) {
   return `${Number(value).toFixed(0)}/100`
 }
 
+function scorePercent(value) {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) return 0
+  return Math.max(0, Math.min(100, numeric))
+}
+
 function positiveCurrency(value) {
   if (
     !Number.isFinite(Number(value)) ||
@@ -41,6 +48,7 @@ function positiveCurrency(value) {
 export default function AssetAiAnalysisPanel({
   aiResult,
   loading,
+  researchLoading = false,
   onAnalyze,
   personalValuesVisible,
   portfolioContext,
@@ -74,7 +82,7 @@ export default function AssetAiAnalysisPanel({
             <select
               value={riskProfile}
               onChange={(event) => setRiskProfile(event.target.value)}
-              disabled={loading}
+              disabled={loading || researchLoading}
             >
               {RISK_PROFILES.map(([value, label]) => (
                 <option key={value} value={value}>{label}</option>
@@ -86,15 +94,23 @@ export default function AssetAiAnalysisPanel({
             type="button"
             className="primary-button asset-ai-button"
             onClick={onAnalyze}
-            disabled={loading || !personalValuesVisible}
+            disabled={loading || researchLoading || !personalValuesVisible}
             title={
-              personalValuesVisible
-                ? 'Pesquisar fontes e gerar análise personalizada'
-                : 'Mostre os valores pessoais para liberar a análise personalizada'
+              !personalValuesVisible
+                ? 'Mostre os valores pessoais para liberar a análise personalizada'
+                : researchLoading
+                  ? 'Aguarde a pesquisa multifontes terminar para evitar consultas duplicadas'
+                  : 'Gerar análise personalizada reutilizando os dados já pesquisados'
             }
           >
             <AppIcon name="sparkles" size={18} />
-            <span>{loading ? 'Analisando...' : 'Analisar com IA'}</span>
+            <span>
+              {loading
+                ? 'Analisando...'
+                : researchLoading
+                  ? 'Aguardando dados...'
+                  : 'Analisar com IA'}
+            </span>
           </button>
         </div>
       </div>
@@ -139,25 +155,44 @@ export default function AssetAiAnalysisPanel({
         </div>
       )}
 
+      <AnimatePresence mode="wait" initial={false}>
       {!recommendation && personalValuesVisible && !loading && (
-        <div className="asset-ai-empty">
+        <m.div
+          key="empty"
+          className="asset-ai-empty"
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0 }}
+        >
           <strong>A IA ainda não foi consultada para este ativo.</strong>
           <p>
             O botão executa uma pesquisa curta em tempo real e envia somente um
             resumo da carteira, sem transmitir todos os registros financeiros.
           </p>
-        </div>
+        </m.div>
       )}
 
       {loading && (
-        <div className="asset-ai-loading">
+        <m.div
+          key="loading"
+          className="asset-ai-loading"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
           <span className="asset-ai-loading-dot" />
           Consultando mercado, cenário macroeconômico e notícias recentes...
-        </div>
+        </m.div>
       )}
 
       {recommendation && personalValuesVisible && !loading && (
-        <div className="asset-ai-result">
+        <m.div
+          key="result"
+          className="asset-ai-result"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0 }}
+        >
           <div className={`asset-ai-recommendation asset-ai-${tone}`}>
             <div>
               <span>Leitura de adequação</span>
@@ -173,10 +208,25 @@ export default function AssetAiAnalysisPanel({
           <p className="asset-ai-summary">{recommendation.summary}</p>
 
           <div className="asset-ai-score-grid">
-            <div><span>Qualidade</span><strong>{scoreValue(recommendation.scores?.quality)}</strong></div>
-            <div><span>Valuation</span><strong>{scoreValue(recommendation.scores?.valuation)}</strong></div>
-            <div><span>Momentum</span><strong>{scoreValue(recommendation.scores?.momentum)}</strong></div>
-            <div><span>Risco</span><strong>{scoreValue(recommendation.scores?.risk)}</strong></div>
+            {[
+              ['Qualidade', recommendation.scores?.quality],
+              ['Valuation', recommendation.scores?.valuation],
+              ['Momentum', recommendation.scores?.momentum],
+              ['Risco', recommendation.scores?.risk],
+            ].map(([label, value]) => (
+              <div key={label}>
+                <span>{label}</span>
+                <strong>{scoreValue(value)}</strong>
+                <div className="asset-ai-score-track" aria-hidden="true">
+                  <m.span
+                    style={{ transformOrigin: 'left center' }}
+                    initial={{ scaleX: 0 }}
+                    animate={{ scaleX: scorePercent(value) / 100 }}
+                    transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+                  />
+                </div>
+              </div>
+            ))}
           </div>
 
           {research && (
@@ -206,6 +256,14 @@ export default function AssetAiAnalysisPanel({
                 <strong>
                   {Number.isFinite(Number(research.coverage?.percent))
                     ? `${Number(research.coverage.percent).toFixed(0)}% · ${research.coverage.grade}`
+                    : '-'}
+                </strong>
+              </div>
+              <div>
+                <span>Tempo da pesquisa</span>
+                <strong>
+                  {Number.isFinite(Number(research.performance?.durationMs))
+                    ? `${(Number(research.performance.durationMs) / 1000).toFixed(1)}s${research.performance.cacheHit ? ' · cache' : ''}`
                     : '-'}
                 </strong>
               </div>
@@ -350,8 +408,9 @@ export default function AssetAiAnalysisPanel({
           <div className="info-callout asset-ai-disclaimer">
             {recommendation.disclaimer}
           </div>
-        </div>
+        </m.div>
       )}
+      </AnimatePresence>
     </section>
   )
 }

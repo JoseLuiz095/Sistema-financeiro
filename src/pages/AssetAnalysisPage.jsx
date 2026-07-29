@@ -3,13 +3,16 @@ import {
   Suspense,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react'
 import AssetAiAnalysisPanel from '../components/AssetAiAnalysisPanel'
+import { MotionReveal } from '../components/AppMotion'
 import Feedback from '../components/Feedback'
 import usePersonalValuesVisibility from '../hooks/usePersonalValuesVisibility'
 import {
   deleteCostBasisAdjustment,
+  enrichAssetAnalysis,
   getAssetAiAnalysis,
   getAssetAnalysis,
   getAssetAnalysisPreference,
@@ -239,6 +242,13 @@ function DataQuality({ analysis }) {
           {Number(quality.briefResearchSourceReliability).toFixed(0)}%
         </span>
       )}
+      {Number.isFinite(Number(quality.briefResearchDurationMs)) && (
+        <span>
+          Pesquisa complementar concluída em{' '}
+          {(Number(quality.briefResearchDurationMs) / 1000).toFixed(1)}s
+          {quality.briefResearchCacheHit ? ' · cache rápido' : ''}
+        </span>
+      )}
       {quality.briefResearchExternalFields?.length > 0 && (
         <span>
           {quality.briefResearchExternalFields.length} campo(s) complementado(s)
@@ -288,6 +298,8 @@ export default function AssetAnalysisPage({
   const [catalogVisibleCount, setCatalogVisibleCount] = useState(80)
   const [analysis, setAnalysis] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [loadingSupplement, setLoadingSupplement] = useState(false)
+  const analysisRequestRef = useRef(0)
   const [aiResult, setAiResult] = useState(null)
   const [loadingAi, setLoadingAi] = useState(false)
   const [riskProfile, setRiskProfile] = useState('moderate')
@@ -495,8 +507,11 @@ export default function AssetAnalysisPage({
 
 
   useEffect(() => {
+    analysisRequestRef.current += 1
     setAnalysis(null)
     setAiResult(null)
+    setLoading(false)
+    setLoadingSupplement(false)
     setHistory(null)
     setShowHistory(false)
     loadLocalSettings(ticker)
@@ -555,29 +570,66 @@ export default function AssetAnalysisPage({
       return
     }
 
+    const requestId = analysisRequestRef.current + 1
+    analysisRequestRef.current = requestId
+    const assetType = getCatalogType(selectedCatalogAsset)
+
     setLoading(true)
+    setLoadingSupplement(false)
     setAiResult(null)
     setFeedback({ type: '', message: '' })
 
     try {
-      const result = await getAssetAnalysis(
+      const primaryResult = await getAssetAnalysis(
         selectedTicker,
         normalizedAssumptions(),
-        getCatalogType(selectedCatalogAsset),
+        assetType,
       )
-      setAnalysis(result)
+
+      if (analysisRequestRef.current !== requestId) return
+
+      setAnalysis(primaryResult)
+      setLoading(false)
+      setLoadingSupplement(true)
       setGlobalFeedback?.({
         type: 'success',
-        message: `Analise de ${selectedTicker} atualizada.`,
+        message: `Dados principais de ${selectedTicker} carregados. Complementando fontes em segundo plano.`,
+      })
+
+      const enrichedResult = await enrichAssetAnalysis({
+        analysis: primaryResult,
+        ticker: selectedTicker,
+        assetType,
+      })
+
+      if (analysisRequestRef.current !== requestId) return
+
+      setAnalysis(enrichedResult)
+      setGlobalFeedback?.({
+        type: 'success',
+        message: `Analise multifontes de ${selectedTicker} atualizada.`,
       })
     } catch (error) {
-      setFeedback({ type: 'error', message: error.message })
+      if (analysisRequestRef.current === requestId) {
+        setFeedback({ type: 'error', message: error.message })
+      }
     } finally {
-      setLoading(false)
+      if (analysisRequestRef.current === requestId) {
+        setLoading(false)
+        setLoadingSupplement(false)
+      }
     }
   }
 
   async function loadAiAnalysis() {
+    if (loadingSupplement) {
+      setFeedback({
+        type: 'error',
+        message: 'Aguarde a pesquisa multifontes terminar para evitar uma consulta duplicada.',
+      })
+      return
+    }
+
     if (!analysis) {
       setFeedback({
         type: 'error',
@@ -631,6 +683,7 @@ export default function AssetAnalysisPage({
           dataQuality: analysis.dataQuality,
         },
         portfolioContext: compactPortfolioContextForAi(portfolioContext),
+        researchSnapshot: analysis.liveResearch ?? null,
       })
 
       setAiResult(result)
@@ -802,8 +855,15 @@ export default function AssetAnalysisPage({
             </button>
           </div>
 
-          <button className="primary-button" disabled={loading || !ticker}>
-            {loading ? 'Calculando...' : 'Analisar ativo'}
+          <button
+            className="primary-button asset-analyze-button"
+            disabled={loading || loadingSupplement || !ticker}
+          >
+            {loading
+              ? 'Buscando dados principais...'
+              : loadingSupplement
+                ? 'Complementando fontes...'
+                : 'Analisar ativo'}
           </button>
         </form>
 
@@ -885,6 +945,34 @@ export default function AssetAnalysisPage({
 
       <Feedback feedback={feedback} />
 
+      {(loading || loadingSupplement) && (
+        <section className="asset-analysis-progress" aria-live="polite">
+          <div className="asset-analysis-progress-copy">
+            <span className="asset-progress-pulse" aria-hidden="true" />
+            <div>
+              <strong>
+                {loading
+                  ? 'Carregando cotação e indicadores principais'
+                  : 'Complementando dados em fontes externas'}
+              </strong>
+              <small>
+                {loading
+                  ? 'A primeira parte será exibida assim que ficar pronta.'
+                  : 'A tela já pode ser consultada enquanto a cobertura é ampliada.'}
+              </small>
+            </div>
+          </div>
+          <div className="asset-analysis-progress-track" aria-hidden="true">
+            <span className={loadingSupplement ? 'is-supplement' : ''} />
+          </div>
+          <div className="asset-analysis-stage-list">
+            <span className={analysis ? 'done' : 'active'}>Mercado</span>
+            <span className={loadingSupplement ? 'active' : analysis?.liveResearch ? 'done' : ''}>Multifontes</span>
+            <span className={analysis?.liveResearch ? 'done' : ''}>Cobertura</span>
+          </div>
+        </section>
+      )}
+
       {!analysis && (
         <section className="panel asset-empty-state">
           <strong>Selecione um ticker e clique em Analisar ativo.</strong>
@@ -895,7 +983,7 @@ export default function AssetAnalysisPage({
       )}
 
       {analysis && (
-        <>
+        <MotionReveal className="asset-analysis-results">
           <section className="panel asset-hero-card">
             <div className="asset-identity">
               {analysis.quote.logoUrl && (
@@ -953,6 +1041,7 @@ export default function AssetAnalysisPage({
           <AssetAiAnalysisPanel
             aiResult={aiResult}
             loading={loadingAi}
+            researchLoading={loadingSupplement}
             onAnalyze={loadAiAnalysis}
             personalValuesVisible={personalValuesVisible}
             portfolioContext={portfolioContext}
@@ -1332,7 +1421,7 @@ export default function AssetAnalysisPage({
           <section className="info-callout asset-risk-warning">
             Os calculos sao ferramentas de estudo e nao garantem retorno. Analise tecnica, preco justo e notas de saude dependem da qualidade dos dados, das premissas e do ciclo da empresa. Nao utilize um unico indicador como ordem automatica de compra.
           </section>
-        </>
+        </MotionReveal>
       )}
     </div>
   )

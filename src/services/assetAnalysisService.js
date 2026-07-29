@@ -5,6 +5,54 @@ import {
 } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 
+const CACHE_TTL = {
+  catalog: 30 * 60 * 1000,
+  overview: 90 * 1000,
+  research: 5 * 60 * 1000,
+  history: 10 * 60 * 1000,
+}
+
+const memoryCache = new Map()
+const inFlightRequests = new Map()
+
+function stableKey(value) {
+  if (!value || typeof value !== 'object') return String(value ?? '')
+  return JSON.stringify(
+    Object.keys(value)
+      .sort()
+      .reduce((result, key) => {
+        result[key] = value[key]
+        return result
+      }, {}),
+  )
+}
+
+async function cachedRequest(key, ttlMs, loader, { forceRefresh = false } = {}) {
+  const now = Date.now()
+  const cached = memoryCache.get(key)
+
+  if (!forceRefresh && cached?.expiresAt > now) {
+    return cached.value
+  }
+
+  if (!forceRefresh && inFlightRequests.has(key)) {
+    return inFlightRequests.get(key)
+  }
+
+  const request = Promise.resolve()
+    .then(loader)
+    .then((value) => {
+      memoryCache.set(key, { value, expiresAt: Date.now() + ttlMs })
+      return value
+    })
+    .finally(() => {
+      inFlightRequests.delete(key)
+    })
+
+  inFlightRequests.set(key, request)
+  return request
+}
+
 async function extractFunctionError(error) {
   if (error instanceof FunctionsHttpError) {
     try {
@@ -148,6 +196,7 @@ function mergeAnalysisWithResearch(base, research, assetType) {
     health,
     sentiment,
     valuation,
+    liveResearch: research,
     dataQuality: {
       ...base.dataQuality,
       warnings,
@@ -164,92 +213,144 @@ function mergeAnalysisWithResearch(base, research, assetType) {
       briefResearchSourceReliability: research.sourceReliabilityPercent ?? null,
       briefResearchConflicts: conflicts,
       briefResearchExternalWarning: research.externalWarning ?? null,
+      briefResearchDurationMs: research.performance?.durationMs ?? null,
+      briefResearchCacheHit: Boolean(research.performance?.cacheHit),
+      briefResearchReusedSnapshot: Boolean(research.performance?.reusedSnapshot),
     },
   }
 }
 
-async function getBriefResearch({ ticker, assetType, assetSnapshot }) {
-  const { data, error } = await supabase.functions.invoke(
-    'asset-ai-analysis',
-    {
-      body: {
-        action: 'research',
-        ticker,
-        assetType,
-        assetSnapshot,
-      },
+async function getBriefResearch({
+  ticker,
+  assetType,
+  assetSnapshot,
+  forceRefresh = false,
+}) {
+  const normalizedTicker = String(ticker).trim().toUpperCase()
+  const key = `research:${normalizedTicker}:${assetType || 'stock'}`
+
+  return cachedRequest(
+    key,
+    CACHE_TTL.research,
+    async () => {
+      const { data, error } = await supabase.functions.invoke(
+        'asset-ai-analysis',
+        {
+          body: {
+            action: 'research',
+            ticker: normalizedTicker,
+            assetType,
+            assetSnapshot,
+            forceRefresh,
+          },
+        },
+      )
+
+      if (error) throw new Error(await extractFunctionError(error))
+      if (!data?.success || !data?.research) {
+        throw new Error(data?.error || 'A pesquisa breve não foi concluída.')
+      }
+
+      return data.research
     },
+    { forceRefresh },
   )
-
-  if (error) throw new Error(await extractFunctionError(error))
-  if (!data?.success || !data?.research) {
-    throw new Error(data?.error || 'A pesquisa breve não foi concluída.')
-  }
-
-  return data.research
 }
 
-export async function listMarketAssets() {
-  const { data, error } = await supabase.functions.invoke(
-    'market-analysis',
-    { body: { action: 'catalog' } },
+export async function listMarketAssets({ forceRefresh = false } = {}) {
+  return cachedRequest(
+    'catalog:b3',
+    CACHE_TTL.catalog,
+    async () => {
+      const { data, error } = await supabase.functions.invoke(
+        'market-analysis',
+        { body: { action: 'catalog' } },
+      )
+
+      if (error) throw new Error(await extractFunctionError(error))
+
+      if (!data?.success) {
+        throw new Error(data?.error || 'A lista de ativos não foi carregada.')
+      }
+
+      return data.assets ?? []
+    },
+    { forceRefresh },
   )
-
-  if (error) throw new Error(await extractFunctionError(error))
-
-  if (!data?.success) {
-    throw new Error(data?.error || 'A lista de ativos não foi carregada.')
-  }
-
-  return data.assets ?? []
 }
 
 export async function getAssetAnalysis(
   ticker,
   assumptions,
   assetType = 'stock',
+  { forceRefresh = false } = {},
 ) {
-  const { data, error } = await supabase.functions.invoke(
-    'market-analysis',
-    {
-      body: {
-        action: 'overview',
-        ticker,
-        assumptions,
-      },
+  const normalizedTicker = String(ticker).trim().toUpperCase()
+  const key = `overview:${normalizedTicker}:${stableKey(assumptions)}`
+
+  const data = await cachedRequest(
+    key,
+    CACHE_TTL.overview,
+    async () => {
+      const { data: response, error } = await supabase.functions.invoke(
+        'market-analysis',
+        {
+          body: {
+            action: 'overview',
+            ticker: normalizedTicker,
+            assumptions,
+          },
+        },
+      )
+
+      if (error) throw new Error(await extractFunctionError(error))
+      if (!response?.success) {
+        throw new Error(response?.error || 'A análise não foi concluída.')
+      }
+
+      return response
     },
+    { forceRefresh },
   )
 
-  if (error) throw new Error(await extractFunctionError(error))
-  if (!data?.success) {
-    throw new Error(data?.error || 'A análise não foi concluída.')
+  return {
+    ...data,
+    assetType: data.assetType || assetType,
   }
+}
 
+export async function enrichAssetAnalysis({
+  analysis,
+  ticker,
+  assetType = 'stock',
+  forceRefresh = false,
+}) {
   try {
     const research = await getBriefResearch({
       ticker,
       assetType,
+      forceRefresh,
       assetSnapshot: {
-        quote: data.quote,
-        profile: data.profile,
-        fundamentals: data.fundamentals,
-        technical: data.technical,
-        health: data.health,
-        valuation: data.valuation,
-        sentiment: data.sentiment,
-        dataQuality: data.dataQuality,
+        quote: analysis.quote,
+        profile: analysis.profile,
+        fundamentals: analysis.fundamentals,
+        technical: analysis.technical,
+        health: analysis.health,
+        valuation: analysis.valuation,
+        sentiment: analysis.sentiment,
+        dataQuality: analysis.dataQuality,
       },
     })
 
-    return mergeAnalysisWithResearch(data, research, assetType)
+    return mergeAnalysisWithResearch(analysis, research, assetType)
   } catch (researchError) {
     return {
-      ...data,
+      ...analysis,
       assetType,
       dataQuality: {
-        ...data.dataQuality,
+        ...analysis.dataQuality,
         warnings: uniqueMessages([
-          ...(data.dataQuality?.warnings ?? []),
+          ...(analysis.dataQuality?.warnings ?? []),
           `Pesquisa breve complementar indisponível: ${researchError.message}`,
         ]),
       },
@@ -257,24 +358,38 @@ export async function getAssetAnalysis(
   }
 }
 
-export async function getAssetHistory(ticker, range = '1y') {
-  const { data, error } = await supabase.functions.invoke(
-    'market-analysis',
-    {
-      body: {
-        action: 'history',
-        ticker,
-        range,
-      },
+export async function getAssetHistory(
+  ticker,
+  range = '1y',
+  { forceRefresh = false } = {},
+) {
+  const normalizedTicker = String(ticker).trim().toUpperCase()
+  const key = `history:${normalizedTicker}:${range}`
+
+  return cachedRequest(
+    key,
+    CACHE_TTL.history,
+    async () => {
+      const { data, error } = await supabase.functions.invoke(
+        'market-analysis',
+        {
+          body: {
+            action: 'history',
+            ticker: normalizedTicker,
+            range,
+          },
+        },
+      )
+
+      if (error) throw new Error(await extractFunctionError(error))
+      if (!data?.success) {
+        throw new Error(data?.error || 'O histórico não foi carregado.')
+      }
+
+      return data
     },
+    { forceRefresh },
   )
-
-  if (error) throw new Error(await extractFunctionError(error))
-  if (!data?.success) {
-    throw new Error(data?.error || 'O histórico não foi carregado.')
-  }
-
-  return data
 }
 
 export async function getAssetAnalysisPreference(ticker) {

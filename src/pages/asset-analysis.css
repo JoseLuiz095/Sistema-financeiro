@@ -1269,3 +1269,220 @@
   line-height: 1.45;
   opacity: 0.86;
 }
+
+/* Etapa 17/18 v4: análise progressiva, Motion e renderização econômica */
+.asset-analysis-results {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+
+.asset-analysis-progress {
+  display: grid;
+  gap: 12px;
+  padding: 16px 18px;
+  border: 1px solid #bcd2e9;
+  border-radius: 15px;
+  background:
+    linear-gradient(135deg, rgba(237, 246, 255, 0.98), rgba(247, 251, 255, 0.98));
+  box-shadow: 0 10px 26px rgba(23, 103, 184, 0.08);
+}
+
+.asset-analysis-progress-copy {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.asset-analysis-progress-copy strong,
+.asset-analysis-progress-copy small {
+  display: block;
+}
+
+.asset-analysis-progress-copy strong {
+  color: #173a5d;
+}
+
+.asset-analysis-progress-copy small {
+  margin-top: 3px;
+  color: #5f7389;
+}
+
+.asset-progress-pulse {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--asset-blue);
+  box-shadow: 0 0 0 0 rgba(23, 103, 184, 0.35);
+  animation: asset-progress-pulse 1.35s ease-out infinite;
+}
+
+@keyframes asset-progress-pulse {
+  70% {
+    box-shadow: 0 0 0 9px rgba(23, 103, 184, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(23, 103, 184, 0);
+  }
+}
+
+.asset-analysis-progress-track {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #dce8f4;
+}
+
+.asset-analysis-progress-track span {
+  display: block;
+  width: 46%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #1767b8, #4a9ce6);
+  animation: asset-progress-track 1.25s ease-in-out infinite alternate;
+}
+
+.asset-analysis-progress-track span.is-supplement {
+  width: 78%;
+  background: linear-gradient(90deg, #1767b8, #17806d);
+}
+
+@keyframes asset-progress-track {
+  from { opacity: 0.72; transform: translateX(-4%); }
+  to { opacity: 1; transform: translateX(4%); }
+}
+
+.asset-analysis-stage-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.asset-analysis-stage-list span {
+  padding: 5px 9px;
+  border: 1px solid #cddbeb;
+  border-radius: 999px;
+  color: #6b7f94;
+  background: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.asset-analysis-stage-list span.active {
+  border-color: #6ea8df;
+  color: #145a9d;
+  background: #edf6ff;
+}
+
+.asset-analysis-stage-list span.done {
+  border-color: #8ac5b6;
+  color: #116244;
+  background: #eaf8f2;
+}
+
+.asset-search-panel {
+  background:
+    radial-gradient(circle at 92% 0%, rgba(23, 103, 184, 0.1), transparent 30%),
+    #ffffff;
+}
+
+.asset-selected-button,
+.asset-metric-grid > div,
+.asset-valuation-range > div,
+.asset-valuation-summary > div,
+.asset-ai-portfolio-strip > div,
+.asset-ai-score-grid > div,
+.asset-ai-research-grid > div {
+  box-shadow: 0 3px 12px rgba(30, 51, 78, 0.035);
+}
+
+.asset-hero-card {
+  border-color: #c3d7eb;
+  background:
+    radial-gradient(circle at 88% 10%, rgba(23, 103, 184, 0.17), transparent 34%),
+    radial-gradient(circle at 7% 100%, rgba(23, 128, 109, 0.08), transparent 28%),
+    linear-gradient(135deg, #ffffff, #f7fbff);
+  box-shadow: 0 16px 38px rgba(30, 80, 128, 0.09);
+}
+
+.asset-analyze-button {
+  min-width: 190px;
+}
+
+.asset-ai-panel {
+  border-color: #b9cee5;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(23, 103, 184, 0.11), transparent 32%),
+    linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+}
+
+.asset-ai-score-track {
+  height: 7px;
+  margin-top: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #dfe8f1;
+}
+
+.asset-ai-score-track > span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #1767b8, #2f8bd7);
+}
+
+.asset-ai-research-grid {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.asset-ai-loading {
+  position: relative;
+  overflow: hidden;
+}
+
+.asset-ai-loading::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #1767b8, transparent);
+  animation: asset-ai-loading-line 1.3s ease-in-out infinite;
+}
+
+@keyframes asset-ai-loading-line {
+  from { transform: translateX(-70%); }
+  to { transform: translateX(70%); }
+}
+
+/* Evita renderizar toda a página longa antes de o usuário rolar. */
+.asset-analysis-results > .asset-analysis-grid,
+.asset-analysis-results > .panel:not(.asset-hero-card):not(.asset-ai-panel),
+.asset-analysis-results > .asset-data-quality,
+.asset-analysis-results > .info-callout {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 420px;
+}
+
+@media (max-width: 760px) {
+  .asset-analysis-progress {
+    padding: 14px;
+  }
+
+  .asset-analysis-progress-copy {
+    align-items: flex-start;
+  }
+
+  .asset-analyze-button {
+    min-width: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .asset-progress-pulse,
+  .asset-analysis-progress-track span,
+  .asset-ai-loading::after {
+    animation: none !important;
+  }
+}

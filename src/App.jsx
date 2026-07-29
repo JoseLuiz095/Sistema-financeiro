@@ -3,6 +3,7 @@ import './App.css'
 import './mobile-ui.css'
 import Feedback from './components/Feedback'
 import AppIcon from './components/AppIcon'
+import { AnimatedPage, AppMotionProvider } from './components/AppMotion'
 import { supabase } from './lib/supabase'
 import useIdleSessionGuard from './hooks/useIdleSessionGuard'
 import usePersonalValuesVisibility, { setPersonalValuesVisibility } from './hooks/usePersonalValuesVisibility'
@@ -556,7 +557,8 @@ export default function App() {
   }
 
   return (
-    <main
+    <AppMotionProvider>
+      <main
       className="app-page"
       data-personal-values-hidden={
         personalValuesVisible
@@ -709,6 +711,9 @@ export default function App() {
           <Feedback feedback={feedback} />
         </div>
 
+        <AnimatedPage
+          pageKey={`${activePage}-${navigationRequest.key}`}
+        >
         {activePage === 'home' && (
           <HomePage
             accounts={accounts}
@@ -797,7 +802,9 @@ export default function App() {
             setFeedback={setFeedback}
           />
         )}
+        </AnimatedPage>
       </section>
-    </main>
+      </main>
+    </AppMotionProvider>
   )
 }
