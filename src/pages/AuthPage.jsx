@@ -19,6 +19,62 @@ function getApplicationUrl() {
   ).replace(/\/+$/, '')
 }
 
+function getAuthErrorMessage(error) {
+  const code = String(error?.code ?? '').trim()
+
+  const messages = {
+    email_exists:
+      'Este e-mail ainda está cadastrado no Supabase Auth.',
+
+    user_already_exists:
+      'Este usuário ainda existe no Supabase Auth.',
+
+    email_address_not_authorized:
+      'O SMTP do Supabase não está autorizado a enviar e-mails para esse endereço. Configure um SMTP próprio.',
+
+    over_email_send_rate_limit:
+      'Muitos e-mails foram enviados recentemente. Aguarde alguns minutos antes de tentar novamente.',
+
+    over_request_rate_limit:
+      'Muitas tentativas foram realizadas. Aguarde alguns minutos.',
+
+    signup_disabled:
+      'A criação de novos usuários está desabilitada no Supabase.',
+
+    email_provider_disabled:
+      'O cadastro por e-mail e senha está desabilitado no Supabase.',
+
+    weak_password:
+      'A senha não atende aos requisitos de segurança configurados.',
+
+    unexpected_failure:
+      'O Supabase encontrou um erro interno ao criar o usuário. Verifique os logs de autenticação e do banco.',
+
+    otp_expired:
+      'O código expirou ou já foi utilizado. Solicite um novo código.',
+
+    validation_failed:
+      'Os dados enviados para autenticação são inválidos.',
+  }
+
+  if (messages[code]) {
+    return messages[code]
+  }
+
+  const message = String(error?.message ?? '').trim()
+
+  if (
+    message &&
+    message !== '{}' &&
+    message !== '[object Object]'
+  ) {
+    return message
+  }
+
+  return 'Não foi possível concluir a operação. Consulte os logs de autenticação do Supabase.'
+}
+
+
 export default function AuthPage() {
   const signupEnabled =
     String(import.meta.env.VITE_ALLOW_SIGNUP ?? 'true') !== 'false'
@@ -88,42 +144,6 @@ export default function AuthPage() {
     setVerificationCode('')
   }
 
-  function getAuthErrorMessage(error) {
-  const code = String(error?.code ?? '').trim()
-
-  const messages = {
-    email_exists:
-      'Este e-mail ainda está cadastrado no Supabase Auth.',
-    user_already_exists:
-      'Este usuário ainda existe no Supabase Auth.',
-    email_address_not_authorized:
-      'O SMTP padrão do Supabase não está autorizado a enviar e-mails para esse endereço. Configure um SMTP próprio.',
-    over_email_send_rate_limit:
-      'Muitos e-mails foram enviados recentemente. Aguarde alguns minutos antes de tentar novamente.',
-    over_request_rate_limit:
-      'Muitas tentativas foram realizadas. Aguarde alguns minutos.',
-    signup_disabled:
-      'A criação de novos usuários está desabilitada no Supabase.',
-    email_provider_disabled:
-      'O cadastro por e-mail e senha está desabilitado no Supabase.',
-    weak_password:
-      'A senha não atende aos requisitos de segurança configurados.',
-    unexpected_failure:
-      'O Supabase encontrou um erro interno ao criar o usuário. Verifique os logs de Auth e do Postgres.',
-  }
-
-  if (messages[code]) {
-    return messages[code]
-  }
-
-  const message = String(error?.message ?? '').trim()
-
-  if (message && message !== '{}' && message !== '[object Object]') {
-    return message
-  }
-
-  return 'Não foi possível criar o usuário. Consulte os logs de autenticação do Supabase.'
-}
 
   function openVerification(emailAddress) {
     const normalizedEmail = emailAddress.trim().toLowerCase()
