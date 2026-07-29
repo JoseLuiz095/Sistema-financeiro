@@ -128,9 +128,43 @@ function metricValue(value, type = 'number') {
   return formatNumber(value)
 }
 
+function assetMetricValue(
+  value,
+  type,
+  assetType,
+  notApplicableFor = [],
+) {
+  if (notApplicableFor.includes(assetType)) return 'Não aplicável'
+  return metricValue(value, type)
+}
+
 function currencyValue(value, currency = 'BRL') {
   if (value == null || !Number.isFinite(Number(value))) return '-'
   return formatCurrency(value, currency)
+}
+
+function positiveCurrencyValue(value, currency = 'BRL') {
+  if (
+    value == null ||
+    !Number.isFinite(Number(value)) ||
+    Number(value) <= 0
+  ) {
+    return '-'
+  }
+
+  return formatCurrency(value, currency)
+}
+
+function positiveNumberValue(value) {
+  if (
+    value == null ||
+    !Number.isFinite(Number(value)) ||
+    Number(value) <= 0
+  ) {
+    return '-'
+  }
+
+  return formatNumber(value)
 }
 
 function scoreLabel(score) {
@@ -174,9 +208,30 @@ function DataQuality({ analysis }) {
       <span>
         Cobertura da saúde: {Number(quality.healthCoverage ?? 0).toFixed(0)}%
       </span>
+      {Number.isFinite(Number(quality.briefResearchCoverage)) && (
+        <span className={Number(quality.briefResearchCoverage) >= 60 ? 'positive' : 'negative'}>
+          Cobertura da pesquisa breve:{' '}
+          {Number(quality.briefResearchCoverage).toFixed(0)}%
+          {quality.briefResearchGrade
+            ? ` · ${quality.briefResearchGrade}`
+            : ''}
+        </span>
+      )}
       <span className={quality.tokenConfigured ? 'positive' : 'negative'}>
         Token da fonte: {quality.tokenConfigured ? 'configurado' : 'não configurado'}
       </span>
+      {quality.briefResearchMissingFields?.length > 0 && (
+        <details>
+          <summary>
+            {quality.briefResearchMissingFields.length} campo(s) ainda sem fonte válida
+          </summary>
+          <ul>
+            {quality.briefResearchMissingFields.map((field) => (
+              <li key={field}>{field}</li>
+            ))}
+          </ul>
+        </details>
+      )}
       {warnings.length > 0 && (
         <details>
           <summary>{warnings.length} aviso(s) da fonte de dados</summary>
@@ -480,6 +535,7 @@ export default function AssetAnalysisPage({
       const result = await getAssetAnalysis(
         selectedTicker,
         normalizedAssumptions(),
+        getCatalogType(selectedCatalogAsset),
       )
       setAnalysis(result)
       setGlobalFeedback?.({
@@ -516,6 +572,9 @@ export default function AssetAnalysisPage({
     try {
       const result = await getAssetAiAnalysis({
         ticker,
+        assetType:
+          analysis.assetType ||
+          getCatalogType(selectedCatalogAsset),
         riskProfile,
         assetSnapshot: {
           quote: analysis.quote,
@@ -879,14 +938,14 @@ export default function AssetAnalysisPage({
                 <h2>Resumo de mercado</h2>
               </div>
               <div className="asset-metric-grid">
-                <div><span>Abertura</span><strong>{currencyValue(analysis.quote.open, analysis.quote.currency)}</strong></div>
-                <div><span>Maxima do dia</span><strong>{currencyValue(analysis.quote.dayHigh, analysis.quote.currency)}</strong></div>
-                <div><span>Minima do dia</span><strong>{currencyValue(analysis.quote.dayLow, analysis.quote.currency)}</strong></div>
-                <div><span>Fechamento anterior</span><strong>{currencyValue(analysis.quote.previousClose, analysis.quote.currency)}</strong></div>
-                <div><span>Maxima 52 semanas</span><strong>{currencyValue(analysis.quote.fiftyTwoWeekHigh, analysis.quote.currency)}</strong></div>
-                <div><span>Minima 52 semanas</span><strong>{currencyValue(analysis.quote.fiftyTwoWeekLow, analysis.quote.currency)}</strong></div>
-                <div><span>Volume</span><strong>{formatNumber(analysis.quote.volume)}</strong></div>
-                <div><span>Valor de mercado</span><strong>{currencyValue(analysis.quote.marketCap, analysis.quote.currency)}</strong></div>
+                <div><span>Abertura</span><strong>{positiveCurrencyValue(analysis.quote.open, analysis.quote.currency)}</strong></div>
+                <div><span>Maxima do dia</span><strong>{positiveCurrencyValue(analysis.quote.dayHigh, analysis.quote.currency)}</strong></div>
+                <div><span>Minima do dia</span><strong>{positiveCurrencyValue(analysis.quote.dayLow, analysis.quote.currency)}</strong></div>
+                <div><span>Fechamento anterior</span><strong>{positiveCurrencyValue(analysis.quote.previousClose, analysis.quote.currency)}</strong></div>
+                <div><span>Maxima 52 semanas</span><strong>{positiveCurrencyValue(analysis.quote.fiftyTwoWeekHigh, analysis.quote.currency)}</strong></div>
+                <div><span>Minima 52 semanas</span><strong>{positiveCurrencyValue(analysis.quote.fiftyTwoWeekLow, analysis.quote.currency)}</strong></div>
+                <div><span>Volume</span><strong>{positiveNumberValue(analysis.quote.volume)}</strong></div>
+                <div><span>Valor de mercado</span><strong>{positiveCurrencyValue(analysis.quote.marketCap, analysis.quote.currency)}</strong></div>
               </div>
             </article>
 
@@ -895,13 +954,13 @@ export default function AssetAnalysisPage({
                 <h2>Multiplos e rentabilidade</h2>
               </div>
               <div className="asset-metric-grid">
-                <div><span>P/L</span><strong>{metricValue(analysis.fundamentals.trailingPe, 'multiple')}</strong></div>
-                <div><span>P/VP</span><strong>{metricValue(analysis.fundamentals.priceToBook, 'multiple')}</strong></div>
-                <div><span>EV/EBITDA</span><strong>{metricValue(analysis.fundamentals.enterpriseToEbitda, 'multiple')}</strong></div>
+                <div><span>P/L</span><strong>{assetMetricValue(analysis.fundamentals.trailingPe, 'multiple', analysis.assetType, ['fii', 'etf'])}</strong></div>
+                <div><span>P/VP</span><strong>{assetMetricValue(analysis.fundamentals.priceToBook, 'multiple', analysis.assetType, ['etf'])}</strong></div>
+                <div><span>EV/EBITDA</span><strong>{assetMetricValue(analysis.fundamentals.enterpriseToEbitda, 'multiple', analysis.assetType, ['fii', 'etf'])}</strong></div>
                 <div><span>Dividend yield</span><strong>{metricValue(analysis.fundamentals.dividendYield, 'percent')}</strong></div>
-                <div><span>ROE</span><strong>{metricValue(analysis.fundamentals.roe, 'percent')}</strong></div>
-                <div><span>ROA</span><strong>{metricValue(analysis.fundamentals.roa, 'percent')}</strong></div>
-                <div><span>Margem liquida</span><strong>{metricValue(analysis.fundamentals.netMargin, 'percent')}</strong></div>
+                <div><span>ROE</span><strong>{assetMetricValue(analysis.fundamentals.roe, 'percent', analysis.assetType, ['fii', 'etf'])}</strong></div>
+                <div><span>ROA</span><strong>{assetMetricValue(analysis.fundamentals.roa, 'percent', analysis.assetType, ['fii', 'etf'])}</strong></div>
+                <div><span>Margem liquida</span><strong>{assetMetricValue(analysis.fundamentals.netMargin, 'percent', analysis.assetType, ['fii', 'etf'])}</strong></div>
                 <div><span>Beta</span><strong>{metricValue(analysis.fundamentals.beta)}</strong></div>
               </div>
             </article>
@@ -1132,7 +1191,7 @@ export default function AssetAnalysisPage({
               <div className="asset-valuation-summary">
                 <div><span>Preco atual</span><strong>{currencyValue(analysis.quote.price, analysis.quote.currency)}</strong></div>
                 <div><span>Potencial ate o preco base</span><strong className={analysis.valuation.upsidePercent >= 0 ? 'positive' : 'negative'}>{formatPercent(analysis.valuation.upsidePercent)}</strong></div>
-                <div><span>Referencia media de analistas</span><strong>{currencyValue(analysis.valuation.analystReference.mean, analysis.quote.currency)}</strong></div>
+                <div><span>Referencia media de analistas</span><strong>{positiveCurrencyValue(analysis.valuation.analystReference.mean, analysis.quote.currency)}</strong></div>
               </div>
             </article>
 

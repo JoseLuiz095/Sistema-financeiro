@@ -23,28 +23,169 @@ async function extractFunctionError(error) {
     return `Falha de rede ao consultar o mercado: ${error.message}`
   }
 
-  return error?.message || 'Falha ao consultar a analise do ativo.'
+  return error?.message || 'Falha ao consultar a análise do ativo.'
 }
 
+function isFiniteNumber(value) {
+  return value !== null &&
+    value !== undefined &&
+    value !== '' &&
+    Number.isFinite(Number(value))
+}
 
-export async function listMarketAssets() {
+function hasPositiveNumber(value) {
+  return isFiniteNumber(value) && Number(value) > 0
+}
+
+function fillMissingObject(base = {}, supplement = {}, positiveFields = []) {
+  const result = { ...base }
+  const positiveSet = new Set(positiveFields)
+
+  Object.entries(supplement ?? {}).forEach(([key, value]) => {
+    if (value === null || value === undefined || value === '') return
+
+    if (typeof value === 'number') {
+      const currentIsValid = positiveSet.has(key)
+        ? hasPositiveNumber(result[key])
+        : isFiniteNumber(result[key])
+      const incomingIsValid = positiveSet.has(key)
+        ? hasPositiveNumber(value)
+        : isFiniteNumber(value)
+
+      if (!currentIsValid && incomingIsValid) result[key] = value
+      return
+    }
+
+    if (!result[key]) result[key] = value
+  })
+
+  return result
+}
+
+function uniqueMessages(values = []) {
+  return [...new Set(values.filter(Boolean).map((item) => String(item)))]
+}
+
+function mergeAnalysisWithResearch(base, research, assetType) {
+  if (!research?.supplement) return base
+
+  const supplement = research.supplement
+  const quote = fillMissingObject(
+    base.quote,
+    supplement.quote,
+    [
+      'price',
+      'previousClose',
+      'open',
+      'dayHigh',
+      'dayLow',
+      'volume',
+      'marketCap',
+      'fiftyTwoWeekHigh',
+      'fiftyTwoWeekLow',
+    ],
+  )
+  const profile = fillMissingObject(base.profile, supplement.profile)
+  const fundamentals = fillMissingObject(
+    base.fundamentals,
+    supplement.fundamentals,
+  )
+  const currentHealthCoverage = Number(base.health?.coverage ?? 0)
+  const researchHealthCoverage = Number(supplement.health?.coverage ?? 0)
+  const semanticHealthReplacement =
+    assetType === 'etf' &&
+    String(supplement.health?.label ?? '').toLowerCase().includes('não aplicável')
+  const health = (
+    semanticHealthReplacement ||
+    (
+      (!isFiniteNumber(base.health?.score) || currentHealthCoverage < 30) &&
+      researchHealthCoverage > currentHealthCoverage
+    )
+  )
+    ? supplement.health
+    : base.health
+  const sentiment = (
+    !base.sentiment?.available &&
+    Number(supplement.sentiment?.articleCount ?? 0) > 0
+  )
+    ? supplement.sentiment
+    : base.sentiment
+  const valuation = {
+    ...base.valuation,
+    analystReference: fillMissingObject(
+      base.valuation?.analystReference,
+      supplement.analystReference,
+      ['mean', 'median', 'count'],
+    ),
+  }
+  const sourceErrors = (research.sources ?? [])
+    .filter((source) => source.status === 'error')
+    .map((source) => `${source.label}: ${source.detail}`)
+  const missingFields = research.coverage?.missingFields ?? []
+  const warnings = uniqueMessages([
+    ...(base.dataQuality?.warnings ?? []),
+    ...sourceErrors,
+    research.coverage?.percent < 60
+      ? `Cobertura da pesquisa breve em ${Number(research.coverage?.percent ?? 0).toFixed(0)}%. A IA não deve emitir indicação favorável enquanto os dados críticos estiverem incompletos.`
+      : null,
+    missingFields.length > 0
+      ? `Campos ainda não localizados: ${missingFields.slice(0, 10).join(', ')}.`
+      : null,
+  ])
+
+  return {
+    ...base,
+    assetType: research.assetType || assetType || 'stock',
+    quote,
+    profile,
+    fundamentals,
+    health,
+    sentiment,
+    valuation,
+    dataQuality: {
+      ...base.dataQuality,
+      warnings,
+      briefResearchUsed: true,
+      briefResearchCoverage: research.coverage?.percent ?? null,
+      briefResearchGrade: research.coverage?.grade ?? null,
+      briefResearchMissingFields: missingFields,
+      briefResearchSources: research.sources ?? [],
+      briefResearchRequestedAt: research.requestedAt ?? null,
+    },
+  }
+}
+
+async function getBriefResearch({ ticker, assetType, assetSnapshot }) {
   const { data, error } = await supabase.functions.invoke(
-    'market-analysis',
+    'asset-ai-analysis',
     {
       body: {
-        action: 'catalog',
+        action: 'research',
+        ticker,
+        assetType,
+        assetSnapshot,
       },
     },
   )
 
-  if (error) {
-    throw new Error(await extractFunctionError(error))
+  if (error) throw new Error(await extractFunctionError(error))
+  if (!data?.success || !data?.research) {
+    throw new Error(data?.error || 'A pesquisa breve não foi concluída.')
   }
 
+  return data.research
+}
+
+export async function listMarketAssets() {
+  const { data, error } = await supabase.functions.invoke(
+    'market-analysis',
+    { body: { action: 'catalog' } },
+  )
+
+  if (error) throw new Error(await extractFunctionError(error))
+
   if (!data?.success) {
-    throw new Error(
-      data?.error || 'A lista de ativos não foi carregada.',
-    )
+    throw new Error(data?.error || 'A lista de ativos não foi carregada.')
   }
 
   return data.assets ?? []
@@ -53,6 +194,7 @@ export async function listMarketAssets() {
 export async function getAssetAnalysis(
   ticker,
   assumptions,
+  assetType = 'stock',
 ) {
   const { data, error } = await supabase.functions.invoke(
     'market-analysis',
@@ -65,21 +207,44 @@ export async function getAssetAnalysis(
     },
   )
 
-  if (error) {
-    throw new Error(await extractFunctionError(error))
-  }
-
+  if (error) throw new Error(await extractFunctionError(error))
   if (!data?.success) {
-    throw new Error(data?.error || 'A analise nao foi concluida.')
+    throw new Error(data?.error || 'A análise não foi concluída.')
   }
 
-  return data
+  try {
+    const research = await getBriefResearch({
+      ticker,
+      assetType,
+      assetSnapshot: {
+        quote: data.quote,
+        profile: data.profile,
+        fundamentals: data.fundamentals,
+        technical: data.technical,
+        health: data.health,
+        valuation: data.valuation,
+        sentiment: data.sentiment,
+        dataQuality: data.dataQuality,
+      },
+    })
+
+    return mergeAnalysisWithResearch(data, research, assetType)
+  } catch (researchError) {
+    return {
+      ...data,
+      assetType,
+      dataQuality: {
+        ...data.dataQuality,
+        warnings: uniqueMessages([
+          ...(data.dataQuality?.warnings ?? []),
+          `Pesquisa breve complementar indisponível: ${researchError.message}`,
+        ]),
+      },
+    }
+  }
 }
 
-export async function getAssetHistory(
-  ticker,
-  range = '1y',
-) {
+export async function getAssetHistory(ticker, range = '1y') {
   const { data, error } = await supabase.functions.invoke(
     'market-analysis',
     {
@@ -91,12 +256,9 @@ export async function getAssetHistory(
     },
   )
 
-  if (error) {
-    throw new Error(await extractFunctionError(error))
-  }
-
+  if (error) throw new Error(await extractFunctionError(error))
   if (!data?.success) {
-    throw new Error(data?.error || 'O historico nao foi carregado.')
+    throw new Error(data?.error || 'O histórico não foi carregado.')
   }
 
   return data
@@ -121,9 +283,7 @@ export async function saveAssetAnalysisPreference(payload) {
 
   const { data, error } = await supabase
     .from('asset_analysis_preferences')
-    .upsert(normalized, {
-      onConflict: 'user_id,ticker',
-    })
+    .upsert(normalized, { onConflict: 'user_id,ticker' })
     .select()
     .single()
 
@@ -173,14 +333,10 @@ export async function deleteCostBasisAdjustment(id) {
 export async function getAssetAiAnalysis(payload) {
   const { data, error } = await supabase.functions.invoke(
     'asset-ai-analysis',
-    {
-      body: payload,
-    },
+    { body: payload },
   )
 
-  if (error) {
-    throw new Error(await extractFunctionError(error))
-  }
+  if (error) throw new Error(await extractFunctionError(error))
 
   if (!data?.success) {
     throw new Error(

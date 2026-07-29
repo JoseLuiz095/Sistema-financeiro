@@ -27,6 +27,17 @@ function scoreValue(value) {
   return `${Number(value).toFixed(0)}/100`
 }
 
+function positiveCurrency(value) {
+  if (
+    !Number.isFinite(Number(value)) ||
+    Number(value) <= 0
+  ) {
+    return '-'
+  }
+
+  return formatCurrency(value)
+}
+
 export default function AssetAiAnalysisPanel({
   aiResult,
   loading,
@@ -172,11 +183,7 @@ export default function AssetAiAnalysisPanel({
             <div className="asset-ai-research-grid">
               <div>
                 <span>Cotação externa</span>
-                <strong>
-                  {Number.isFinite(Number(research.market?.price))
-                    ? formatCurrency(research.market.price)
-                    : '-'}
-                </strong>
+                <strong>{positiveCurrency(research.market?.price)}</strong>
               </div>
               <div>
                 <span>Selic anual</span>
@@ -195,10 +202,35 @@ export default function AssetAiAnalysisPanel({
                 </strong>
               </div>
               <div>
-                <span>Notícias localizadas</span>
-                <strong>{research.news?.length ?? 0}</strong>
+                <span>Cobertura dos dados</span>
+                <strong>
+                  {Number.isFinite(Number(research.coverage?.percent))
+                    ? `${Number(research.coverage.percent).toFixed(0)}% · ${research.coverage.grade}`
+                    : '-'}
+                </strong>
               </div>
             </div>
+          )}
+
+          {research?.coverage && !research.coverage.recommendationAllowed && (
+            <div className="info-callout asset-ai-data-warning">
+              A cobertura atual não permite uma indicação favorável. A IA foi
+              bloqueada de sugerir aumento de posição e retornou apenas uma
+              orientação de espera e conferência das fontes.
+            </div>
+          )}
+
+          {research?.coverage?.missingFields?.length > 0 && (
+            <details className="asset-ai-sources">
+              <summary>
+                Campos que ainda precisam de uma fonte válida ({research.coverage.missingFields.length})
+              </summary>
+              <ul>
+                {research.coverage.missingFields.map((field) => (
+                  <li key={field}>{field}</li>
+                ))}
+              </ul>
+            </details>
           )}
 
           <div className="asset-ai-columns">
