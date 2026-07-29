@@ -169,3 +169,24 @@ export async function deleteCostBasisAdjustment(id) {
 
   if (error) throw error
 }
+
+export async function getAssetAiAnalysis(payload) {
+  const { data, error } = await supabase.functions.invoke(
+    'asset-ai-analysis',
+    {
+      body: payload,
+    },
+  )
+
+  if (error) {
+    throw new Error(await extractFunctionError(error))
+  }
+
+  if (!data?.success) {
+    throw new Error(
+      data?.error || 'A análise personalizada com IA não foi concluída.',
+    )
+  }
+
+  return data
+}

@@ -5,10 +5,12 @@ import {
   useMemo,
   useState,
 } from 'react'
+import AssetAiAnalysisPanel from '../components/AssetAiAnalysisPanel'
 import Feedback from '../components/Feedback'
 import usePersonalValuesVisibility from '../hooks/usePersonalValuesVisibility'
 import {
   deleteCostBasisAdjustment,
+  getAssetAiAnalysis,
   getAssetAnalysis,
   getAssetAnalysisPreference,
   getAssetHistory,
@@ -19,6 +21,8 @@ import {
 } from '../services/assetAnalysisService'
 import {
   aggregateCostBasis,
+  buildPortfolioContext,
+  compactPortfolioContextForAi,
   calculateAdjustedPosition,
   DEFAULT_ANALYSIS_ASSUMPTIONS,
   getHealthTone,
@@ -201,6 +205,9 @@ export default function AssetAnalysisPage({
   const [catalogVisibleCount, setCatalogVisibleCount] = useState(80)
   const [analysis, setAnalysis] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [aiResult, setAiResult] = useState(null)
+  const [loadingAi, setLoadingAi] = useState(false)
+  const [riskProfile, setRiskProfile] = useState('moderate')
   const [saving, setSaving] = useState(false)
   const [history, setHistory] = useState(null)
   const [historyRange, setHistoryRange] = useState('1y')
@@ -343,6 +350,15 @@ export default function AssetAnalysisPage({
     [adjustments],
   )
 
+  const portfolioContext = useMemo(
+    () => buildPortfolioContext({
+      positions: importedPositions,
+      ticker,
+      adjustedPosition,
+    }),
+    [importedPositions, ticker, adjustedPosition],
+  )
+
   useEffect(() => {
     if (
       catalogFilter === 'portfolio' &&
@@ -397,6 +413,7 @@ export default function AssetAnalysisPage({
 
   useEffect(() => {
     setAnalysis(null)
+    setAiResult(null)
     setHistory(null)
     setShowHistory(false)
     loadLocalSettings(ticker)
@@ -456,6 +473,7 @@ export default function AssetAnalysisPage({
     }
 
     setLoading(true)
+    setAiResult(null)
     setFeedback({ type: '', message: '' })
 
     try {
@@ -472,6 +490,71 @@ export default function AssetAnalysisPage({
       setFeedback({ type: 'error', message: error.message })
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function loadAiAnalysis() {
+    if (!analysis) {
+      setFeedback({
+        type: 'error',
+        message: 'Calcule a análise do ativo antes de consultar a IA.',
+      })
+      return
+    }
+
+    if (!personalValuesVisible) {
+      setFeedback({
+        type: 'error',
+        message: 'Mostre os valores pessoais para liberar a análise personalizada.',
+      })
+      return
+    }
+
+    setLoadingAi(true)
+    setFeedback({ type: '', message: '' })
+
+    try {
+      const result = await getAssetAiAnalysis({
+        ticker,
+        riskProfile,
+        assetSnapshot: {
+          quote: analysis.quote,
+          profile: analysis.profile,
+          fundamentals: analysis.fundamentals,
+          technical: {
+            score: analysis.technical?.score,
+            label: analysis.technical?.label,
+            indicators: analysis.technical?.indicators,
+            signals: analysis.technical?.signals,
+          },
+          health: {
+            score: analysis.health?.score,
+            label: analysis.health?.label,
+            categories: (analysis.health?.categories ?? []).map((item) => ({
+              label: item.label,
+              score: item.score,
+            })),
+          },
+          valuation: analysis.valuation,
+          sentiment: {
+            score: analysis.sentiment?.score,
+            label: analysis.sentiment?.label,
+            periodDays: analysis.sentiment?.periodDays,
+          },
+          dataQuality: analysis.dataQuality,
+        },
+        portfolioContext: compactPortfolioContextForAi(portfolioContext),
+      })
+
+      setAiResult(result)
+      setGlobalFeedback?.({
+        type: 'success',
+        message: `Análise com IA de ${ticker} concluída sem gravação no banco.`,
+      })
+    } catch (error) {
+      setFeedback({ type: 'error', message: error.message })
+    } finally {
+      setLoadingAi(false)
     }
   }
 
@@ -779,6 +862,16 @@ export default function AssetAnalysisPage({
               <small>Com margem de seguranca configurada</small>
             </article>
           </section>
+
+          <AssetAiAnalysisPanel
+            aiResult={aiResult}
+            loading={loadingAi}
+            onAnalyze={loadAiAnalysis}
+            personalValuesVisible={personalValuesVisible}
+            portfolioContext={portfolioContext}
+            riskProfile={riskProfile}
+            setRiskProfile={setRiskProfile}
+          />
 
           <section className="asset-analysis-grid">
             <article className="panel">
