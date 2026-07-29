@@ -170,6 +170,82 @@ const ICONS = {
       <path d="m5 14 1 2.8 2.8 1L6 18.8 5 22l-1-3.2-3-1 3-1L5 14Z" />
     </>
   ),
+  calculator: (
+    <>
+      <rect x="4" y="2.5" width="16" height="19" rx="3" />
+      <path d="M7.5 6.5h9M8 11h.01M12 11h.01M16 11h.01M8 15h.01M12 15h.01M16 15h.01M8 18.5h.01M12 18.5h4" />
+    </>
+  ),
+  search: (
+    <>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-4-4" />
+    </>
+  ),
+  interest: (
+    <>
+      <path d="M4 18 18 4" />
+      <circle cx="7" cy="7" r="2.5" />
+      <circle cx="17" cy="17" r="2.5" />
+    </>
+  ),
+  percent: (
+    <>
+      <path d="M5 19 19 5" />
+      <circle cx="7" cy="7" r="2" />
+      <circle cx="17" cy="17" r="2" />
+    </>
+  ),
+  target: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="12" r="5" />
+      <circle cx="12" cy="12" r="1.5" />
+    </>
+  ),
+  retirement: (
+    <>
+      <path d="M4 20V9l8-5 8 5v11" />
+      <path d="M8 20v-6h8v6M7 10h10" />
+    </>
+  ),
+  income: (
+    <>
+      <path d="M4 7h16v11H4z" />
+      <path d="M8 11h8M8 14h5" />
+      <circle cx="17" cy="15" r="1.5" />
+    </>
+  ),
+  reserve: (
+    <>
+      <path d="M5 9h14l-1 11H6L5 9Z" />
+      <path d="M8 9V6a4 4 0 0 1 8 0v3M9 13h6" />
+    </>
+  ),
+  compare: (
+    <>
+      <path d="M7 4v16M17 4v16M4 8h6M14 16h6" />
+      <path d="m7 5-3 3 3 3M17 13l3 3-3 3" />
+    </>
+  ),
+  card: (
+    <>
+      <rect x="3" y="5" width="18" height="14" rx="3" />
+      <path d="M3 10h18M7 15h4" />
+    </>
+  ),
+  house: (
+    <>
+      <path d="m3 11 9-7 9 7" />
+      <path d="M5 10v10h14V10M9 20v-6h6v6" />
+    </>
+  ),
+  compareHouse: (
+    <>
+      <path d="m3 10 6-5 6 5v9H4v-9" />
+      <path d="M16 7h5M18 4l3 3-3 3M21 17h-5M19 14l-3 3 3 3" />
+    </>
+  ),
   arrow: <path d="m9 18 6-6-6-6" />,
 }
 

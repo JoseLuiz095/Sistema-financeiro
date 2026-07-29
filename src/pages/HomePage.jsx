@@ -212,6 +212,19 @@ export default function HomePage({
             />
             Abrir análises
           </button>
+
+
+          <button
+            type="button"
+            className="secondary-button action-button-with-icon"
+            onClick={() => onNavigate('calculators')}
+          >
+            <AppIcon
+              name="calculator"
+              size={18}
+            />
+            Calculadoras
+          </button>
         </div>
       </section>
 

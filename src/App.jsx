@@ -8,6 +8,7 @@ import { supabase } from './lib/supabase'
 import useIdleSessionGuard from './hooks/useIdleSessionGuard'
 import usePersonalValuesVisibility, { setPersonalValuesVisibility } from './hooks/usePersonalValuesVisibility'
 import AnalyticsPage from './pages/AnalyticsPage'
+import CalculatorsPage from './pages/CalculatorsPage'
 import AuthPage from './pages/AuthPage'
 import DataPage from './pages/DataPage'
 import HomePage from './pages/HomePage'
@@ -60,6 +61,11 @@ const NAV_ITEMS = [
     icon: 'analytics',
   },
   {
+    value: 'calculators',
+    label: 'Calculadoras',
+    icon: 'calculator',
+  },
+  {
     value: 'more',
     label: 'Mais',
     icon: 'more',
@@ -68,13 +74,41 @@ const NAV_ITEMS = [
 
 function LoadingPage({
   message = 'Carregando dados...',
+  detail = 'Preparando uma experiência segura e personalizada.',
 }) {
   return (
-    <main className="loading-page">
-      <div className="loading-card">
-        <div className="spinner" />
-        <p>{message}</p>
-      </div>
+    <main className="loading-page complete-loading-page">
+      <div className="loading-ambient loading-ambient-one" />
+      <div className="loading-ambient loading-ambient-two" />
+
+      <section className="loading-card complete-loading-card" aria-live="polite">
+        <div className="loading-brand-orbit" aria-hidden="true">
+          <span className="loading-orbit-ring" />
+          <span className="loading-orbit-dot loading-orbit-dot-one" />
+          <span className="loading-orbit-dot loading-orbit-dot-two" />
+          <div className="loading-brand-core">
+            <AppIcon name="wallet" size={28} />
+          </div>
+        </div>
+
+        <span className="loading-kicker">Financeiro Pessoal</span>
+        <h1>{message}</h1>
+        <p>{detail}</p>
+
+        <div className="loading-progress-track" aria-hidden="true">
+          <span />
+        </div>
+
+        <div className="loading-stage-grid" aria-hidden="true">
+          <div className="active"><AppIcon name="shield" size={16} /><span>Segurança</span></div>
+          <div><AppIcon name="data" size={16} /><span>Dados</span></div>
+          <div><AppIcon name="analytics" size={16} /><span>Indicadores</span></div>
+        </div>
+
+        <div className="loading-bars" aria-hidden="true">
+          <span /><span /><span /><span /><span />
+        </div>
+      </section>
     </main>
   )
 }
@@ -96,6 +130,10 @@ export default function App() {
   const [
     loadingData,
     setLoadingData,
+  ] = useState(false)
+  const [
+    privateDataReady,
+    setPrivateDataReady,
   ] = useState(false)
   const [
     activePage,
@@ -248,6 +286,7 @@ export default function App() {
 
   useEffect(() => {
     if (!canLoadPrivateData) {
+      setPrivateDataReady(false)
       setAccounts([])
       setCategories([])
       setTransactions([])
@@ -430,6 +469,7 @@ export default function App() {
       })
     } finally {
       setLoadingData(false)
+      setPrivateDataReady(true)
     }
   }
 
@@ -532,7 +572,7 @@ export default function App() {
 
   if (checkingSession) {
     return (
-      <LoadingPage message="Verificando sessão..." />
+      <LoadingPage message="Verificando sessão..." detail="Validando sua sessão antes de liberar o painel financeiro." />
     )
   }
 
@@ -544,6 +584,7 @@ export default function App() {
     return (
       <LoadingPage
         message="Verificando segurança da conta..."
+        detail="Confirmando autenticação e proteção dos seus dados pessoais."
       />
     )
   }
@@ -552,6 +593,15 @@ export default function App() {
     return (
       <MfaChallengePage
         onVerified={handleMfaVerified}
+      />
+    )
+  }
+
+  if (canLoadPrivateData && !privateDataReady) {
+    return (
+      <LoadingPage
+        message="Montando seu painel..."
+        detail="Consolidando contas, transações, investimentos e indicadores."
       />
     )
   }
@@ -779,6 +829,12 @@ export default function App() {
             }
             onChanged={loadAllData}
             setFeedback={setFeedback}
+          />
+        )}
+
+        {activePage === 'calculators' && (
+          <CalculatorsPage
+            key={`calculators-${navigationRequest.key}`}
           />
         )}
 
