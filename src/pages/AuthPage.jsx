@@ -54,7 +54,7 @@ function readAuthErrorText(error) {
 
 function getAuthErrorMessage(
   error,
-  fallback = 'Não foi possível concluir a operação de autenticação.',
+  fallback = 'Não foi possível concluir esta operação.',
 ) {
   const code = String(
     error?.code ??
@@ -70,43 +70,45 @@ function getAuthErrorMessage(
 
   const messages = {
     email_exists:
-      'Este e-mail ainda está cadastrado no Supabase Auth. Exclua o usuário permanentemente em Authentication > Users ou entre com a conta existente.',
+      'Este e-mail já possui uma conta. Tente entrar ou use a recuperação de senha.',
     user_already_exists:
-      'Este usuário ainda existe no Supabase Auth. Confirme se a exclusão anterior foi permanente.',
+      'Este e-mail já possui uma conta. Tente entrar ou use a recuperação de senha.',
     identity_already_exists:
-      'Já existe uma identidade de login vinculada a este e-mail.',
+      'Este e-mail já está vinculado a uma conta. Tente entrar.',
     email_address_not_authorized:
-      'O serviço de e-mail não está autorizado a enviar para este endereço. Configure o SMTP próprio no Supabase.',
+      'Não foi possível enviar o e-mail de confirmação. Tente novamente mais tarde.',
     email_not_confirmed:
-      'Este e-mail ainda não foi confirmado. Informe o código enviado para concluir o cadastro.',
+      'Seu e-mail ainda não foi confirmado. Informe o código recebido para continuar.',
     invalid_credentials:
       'E-mail ou senha inválidos.',
     otp_expired:
       'O código expirou ou já foi utilizado. Solicite um novo código.',
     otp_disabled:
-      'A confirmação por código está desabilitada no Supabase.',
+      'A confirmação por código está temporariamente indisponível.',
     over_email_send_rate_limit:
-      'Muitos e-mails foram enviados recentemente. Aguarde alguns minutos antes de tentar novamente.',
+      'Muitos códigos foram solicitados em pouco tempo. Aguarde alguns minutos e tente novamente.',
     over_request_rate_limit:
-      'Muitas tentativas foram realizadas. Aguarde alguns minutos.',
+      'Muitas tentativas foram realizadas. Aguarde alguns minutos e tente novamente.',
     request_timeout:
-      'A autenticação demorou além do esperado. Verifique sua conexão e tente novamente.',
+      'A solicitação demorou além do esperado. Verifique sua conexão e tente novamente.',
     signup_disabled:
-      'A criação de novos usuários está desabilitada no Supabase.',
+      'A criação de novas contas está temporariamente indisponível.',
     email_provider_disabled:
-      'O cadastro por e-mail e senha está desabilitado no Supabase.',
+      'O cadastro por e-mail está temporariamente indisponível.',
     weak_password:
-      'A senha não atende aos requisitos de segurança configurados.',
+      'Escolha uma senha mais forte para continuar.',
     validation_failed:
-      'Os dados enviados para autenticação são inválidos.',
+      'Confira os dados informados e tente novamente.',
     user_not_found:
-      'O usuário não foi encontrado. Faça um novo cadastro.',
+      'Não encontramos uma conta com este e-mail.',
     session_not_found:
-      'A sessão não foi encontrada. Entre novamente.',
+      'Sua sessão não foi encontrada. Entre novamente.',
     session_expired:
-      'A sessão expirou. Entre novamente.',
+      'Sua sessão expirou. Entre novamente.',
     unexpected_failure:
-      'O Supabase retornou um erro interno no cadastro. Verifique primeiro o Sender email address e o SMTP; se estiverem corretos, consulte os Auth Logs.',
+      'Não foi possível concluir o cadastro agora. Tente novamente em alguns minutos.',
+    empty_signup_response:
+      'Não foi possível concluir o cadastro agora. Tente novamente em alguns minutos.',
   }
 
   if (messages[code]) {
@@ -121,19 +123,23 @@ function getAuthErrorMessage(
     }
 
     if (/network|fetch|offline/i.test(message)) {
-      return 'Não foi possível acessar o serviço de autenticação. Verifique a conexão com a internet.'
+      return 'Não foi possível acessar o serviço. Verifique sua conexão com a internet e tente novamente.'
     }
 
-    return message
+    if (/smtp|mailer|sending confirmation|send email/i.test(message)) {
+      return 'Não foi possível enviar o e-mail de confirmação. Tente novamente mais tarde.'
+    }
+
+    if (/password/i.test(message)) {
+      return 'Confira a senha informada e tente novamente.'
+    }
   }
 
   if (status >= 500) {
-    return 'O serviço de autenticação retornou um erro interno. Verifique o Sender email address e o SMTP; se estiverem corretos, consulte os Auth Logs do Supabase.'
+    return 'Não foi possível concluir sua solicitação agora. Tente novamente em alguns minutos.'
   }
 
-  return code
-    ? `${fallback} Código: ${code}.`
-    : fallback
+  return fallback
 }
 
 function logAuthError(context, error) {
@@ -286,7 +292,7 @@ export default function AuthPage() {
 
         if (isMaskedExistingUser(data)) {
           const duplicateError = new Error(
-            'Este e-mail já possui um cadastro ou ainda não foi removido permanentemente do Supabase Auth.',
+            'Este e-mail já possui uma conta. Tente entrar ou use a recuperação de senha.',
           )
           duplicateError.code = 'email_exists'
           duplicateError.status = 422
@@ -295,7 +301,7 @@ export default function AuthPage() {
 
         if (!data?.user && !data?.session) {
           const emptyResponseError = new Error(
-            'O Supabase não retornou os dados do novo usuário. Consulte os Auth Logs antes de repetir o cadastro.',
+            'Não foi possível concluir o cadastro agora. Tente novamente em alguns minutos.',
           )
           emptyResponseError.code = 'empty_signup_response'
           throw emptyResponseError
