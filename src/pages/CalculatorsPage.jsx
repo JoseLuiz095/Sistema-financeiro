@@ -144,6 +144,70 @@ function SelectField({ label, value, onChange, options }) {
   )
 }
 
+const DURATION_LABELS = {
+  days: 'Dias',
+  months: 'Meses',
+  years: 'Anos',
+}
+
+function durationToMonths(value, unit) {
+  const amount = Math.max(0, Number(value) || 0)
+  if (unit === 'years') return amount * 12
+  if (unit === 'days') return amount / 30.4375
+  return amount
+}
+
+function durationToYears(value, unit) {
+  return durationToMonths(value, unit) / 12
+}
+
+function durationToDays(value, unit) {
+  const amount = Math.max(0, Number(value) || 0)
+  if (unit === 'years') return amount * 365
+  if (unit === 'months') return amount * 30.4375
+  return amount
+}
+
+function DurationField({
+  label,
+  value,
+  onChange,
+  unit,
+  onUnitChange,
+  units = ['months', 'years'],
+  min = 1,
+  step = 1,
+  helper,
+}) {
+  return (
+    <label className="calculator-field calculator-duration-field">
+      <span>{label}</span>
+      <div className="calculator-duration-control">
+        <input
+          className="personal-private-input"
+          type="number"
+          min={min}
+          step={step}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+        />
+        <select
+          aria-label={`Unidade do campo ${label}`}
+          value={unit}
+          onChange={(event) => onUnitChange(event.target.value)}
+        >
+          {units.map((item) => (
+            <option key={item} value={item}>
+              {DURATION_LABELS[item]}
+            </option>
+          ))}
+        </select>
+      </div>
+      {helper && <em>{helper}</em>}
+    </label>
+  )
+}
+
 function ResultMetric({ label, value, tone = '', helper }) {
   return (
     <article className="calculator-result-metric">
@@ -184,13 +248,14 @@ function CompoundCalculator() {
   const [initial, setInitial] = useState('10000')
   const [monthly, setMonthly] = useState('1000')
   const [rate, setRate] = useState('10')
-  const [years, setYears] = useState('10')
+  const [term, setTerm] = useState('10')
+  const [termUnit, setTermUnit] = useState('years')
   const result = useMemo(() => buildCompoundProjection({
     initialAmount: initial,
     monthlyContribution: monthly,
     annualRate: rate,
-    years,
-  }), [initial, monthly, rate, years])
+    years: durationToYears(term, termUnit),
+  }), [initial, monthly, rate, term, termUnit])
 
   return (
     <CalculatorShell
@@ -212,7 +277,7 @@ function CompoundCalculator() {
       <NumericField label="Valor inicial" value={initial} onChange={setInitial} suffix="R$" />
       <NumericField label="Aporte mensal" value={monthly} onChange={setMonthly} suffix="R$" />
       <NumericField label="Rentabilidade anual" value={rate} onChange={setRate} suffix="% a.a." />
-      <NumericField label="Prazo" value={years} onChange={setYears} suffix="anos" step="1" />
+      <DurationField label="Prazo" value={term} onChange={setTerm} unit={termUnit} onUnitChange={setTermUnit} />
     </CalculatorShell>
   )
 }
@@ -220,8 +285,13 @@ function CompoundCalculator() {
 function SimpleInterestCalculator() {
   const [principal, setPrincipal] = useState('10000')
   const [rate, setRate] = useState('12')
-  const [months, setMonths] = useState('12')
-  const result = useMemo(() => buildSimpleInterestProjection({ principal, annualRate: rate, months }), [principal, rate, months])
+  const [term, setTerm] = useState('12')
+  const [termUnit, setTermUnit] = useState('months')
+  const result = useMemo(() => buildSimpleInterestProjection({
+    principal,
+    annualRate: rate,
+    months: durationToMonths(term, termUnit),
+  }), [principal, rate, term, termUnit])
 
   return (
     <CalculatorShell
@@ -241,7 +311,7 @@ function SimpleInterestCalculator() {
     >
       <NumericField label="Capital inicial" value={principal} onChange={setPrincipal} suffix="R$" />
       <NumericField label="Taxa anual" value={rate} onChange={setRate} suffix="% a.a." />
-      <NumericField label="Prazo" value={months} onChange={setMonths} suffix="meses" step="1" />
+      <DurationField label="Prazo" value={term} onChange={setTerm} unit={termUnit} onUnitChange={setTermUnit} />
     </CalculatorShell>
   )
 }
@@ -363,12 +433,13 @@ function EmergencyCalculator() {
   const [coverage, setCoverage] = useState('6')
   const [current, setCurrent] = useState('8000')
   const [deadline, setDeadline] = useState('12')
+  const [deadlineUnit, setDeadlineUnit] = useState('months')
   const result = useMemo(() => calculateEmergencyReserve({
     essentialMonthlyExpenses: expenses,
     coverageMonths: coverage,
     currentReserve: current,
-    deadlineMonths: deadline,
-  }), [expenses, coverage, current, deadline])
+    deadlineMonths: durationToMonths(deadline, deadlineUnit),
+  }), [expenses, coverage, current, deadline, deadlineUnit])
 
   return (
     <CalculatorShell
@@ -386,7 +457,7 @@ function EmergencyCalculator() {
       <NumericField label="Despesas essenciais mensais" value={expenses} onChange={setExpenses} suffix="R$" />
       <NumericField label="Meses de cobertura" value={coverage} onChange={setCoverage} suffix="meses" step="1" />
       <NumericField label="Reserva atual" value={current} onChange={setCurrent} suffix="R$" />
-      <NumericField label="Prazo para completar" value={deadline} onChange={setDeadline} suffix="meses" step="1" />
+      <DurationField label="Prazo para completar" value={deadline} onChange={setDeadline} unit={deadlineUnit} onUnitChange={setDeadlineUnit} />
     </CalculatorShell>
   )
 }
@@ -395,15 +466,16 @@ function FixedIncomeCalculator() {
   const [principal, setPrincipal] = useState('10000')
   const [cdi, setCdi] = useState('14.9')
   const [percentCdi, setPercentCdi] = useState('100')
-  const [days, setDays] = useState('365')
+  const [term, setTerm] = useState('1')
+  const [termUnit, setTermUnit] = useState('years')
   const [taxExempt, setTaxExempt] = useState('false')
   const result = useMemo(() => calculateFixedIncome({
     principal,
     annualCdi: cdi,
     cdiPercent: percentCdi,
-    days,
+    days: durationToDays(term, termUnit),
     taxExempt: taxExempt === 'true',
-  }), [principal, cdi, percentCdi, days, taxExempt])
+  }), [principal, cdi, percentCdi, term, termUnit, taxExempt])
 
   return (
     <CalculatorShell
@@ -426,7 +498,7 @@ function FixedIncomeCalculator() {
       <NumericField label="Valor investido" value={principal} onChange={setPrincipal} suffix="R$" />
       <NumericField label="CDI anual" value={cdi} onChange={setCdi} suffix="% a.a." />
       <NumericField label="Percentual do CDI" value={percentCdi} onChange={setPercentCdi} suffix="% do CDI" />
-      <NumericField label="Prazo" value={days} onChange={setDays} suffix="dias" step="1" />
+      <DurationField label="Prazo" value={term} onChange={setTerm} unit={termUnit} onUnitChange={setTermUnit} units={['days', 'months', 'years']} />
       <SelectField label="Tributação" value={taxExempt} onChange={setTaxExempt} options={[
         { value: 'false', label: 'Tributado (ex.: CDB)' },
         { value: 'true', label: 'Isento de IR (ex.: LCI/LCA elegível)' },
@@ -437,19 +509,20 @@ function FixedIncomeCalculator() {
 
 function SavingsVsCdiCalculator() {
   const [principal, setPrincipal] = useState('10000')
-  const [months, setMonths] = useState('24')
+  const [term, setTerm] = useState('24')
+  const [termUnit, setTermUnit] = useState('months')
   const [selic, setSelic] = useState('15')
   const [tr, setTr] = useState('1.5')
   const [cdi, setCdi] = useState('14.9')
   const [percentCdi, setPercentCdi] = useState('100')
   const result = useMemo(() => calculateSavingsVsCdi({
     principal,
-    months,
+    months: durationToMonths(term, termUnit),
     selicAnnual: selic,
     trAnnual: tr,
     cdiAnnual: cdi,
     cdiPercent: percentCdi,
-  }), [principal, months, selic, tr, cdi, percentCdi])
+  }), [principal, term, termUnit, selic, tr, cdi, percentCdi])
 
   return (
     <CalculatorShell
@@ -470,7 +543,7 @@ function SavingsVsCdiCalculator() {
       ]} title="Comparação de saldo" />}
     >
       <NumericField label="Valor inicial" value={principal} onChange={setPrincipal} suffix="R$" />
-      <NumericField label="Prazo" value={months} onChange={setMonths} suffix="meses" step="1" />
+      <DurationField label="Prazo" value={term} onChange={setTerm} unit={termUnit} onUnitChange={setTermUnit} />
       <NumericField label="Selic anual" value={selic} onChange={setSelic} suffix="% a.a." />
       <NumericField label="TR anual estimada" value={tr} onChange={setTr} suffix="% a.a." />
       <NumericField label="CDI anual" value={cdi} onChange={setCdi} suffix="% a.a." />
@@ -521,15 +594,16 @@ function FinancingCalculator() {
   const [value, setValue] = useState('400000')
   const [down, setDown] = useState('80000')
   const [rate, setRate] = useState('11')
-  const [months, setMonths] = useState('360')
+  const [term, setTerm] = useState('30')
+  const [termUnit, setTermUnit] = useState('years')
   const [system, setSystem] = useState('SAC')
   const result = useMemo(() => buildFinancingSchedule({
     assetValue: value,
     downPayment: down,
     annualRate: rate,
-    months,
+    months: durationToMonths(term, termUnit),
     system,
-  }), [value, down, rate, months, system])
+  }), [value, down, rate, term, termUnit, system])
 
   return (
     <CalculatorShell
@@ -553,7 +627,7 @@ function FinancingCalculator() {
       <NumericField label="Valor do bem" value={value} onChange={setValue} suffix="R$" />
       <NumericField label="Entrada" value={down} onChange={setDown} suffix="R$" />
       <NumericField label="Taxa anual" value={rate} onChange={setRate} suffix="% a.a." />
-      <NumericField label="Prazo" value={months} onChange={setMonths} suffix="meses" step="1" />
+      <DurationField label="Prazo" value={term} onChange={setTerm} unit={termUnit} onUnitChange={setTermUnit} />
       <SelectField label="Sistema" value={system} onChange={setSystem} options={[
         { value: 'SAC', label: 'SAC — amortização constante' },
         { value: 'PRICE', label: 'Price — parcela constante' },
@@ -567,7 +641,8 @@ function RentFinanceCalculator() {
   const [rent, setRent] = useState('2200')
   const [down, setDown] = useState('80000')
   const [financeRate, setFinanceRate] = useState('11')
-  const [years, setYears] = useState('20')
+  const [term, setTerm] = useState('20')
+  const [termUnit, setTermUnit] = useState('years')
   const [investmentReturn, setInvestmentReturn] = useState('10')
   const [appreciation, setAppreciation] = useState('5')
   const result = useMemo(() => calculateRentVsFinance({
@@ -575,10 +650,10 @@ function RentFinanceCalculator() {
     rentMonthly: rent,
     downPayment: down,
     annualFinanceRate: financeRate,
-    years,
+    years: durationToYears(term, termUnit),
     annualInvestmentReturn: investmentReturn,
     annualPropertyAppreciation: appreciation,
-  }), [property, rent, down, financeRate, years, investmentReturn, appreciation])
+  }), [property, rent, down, financeRate, term, termUnit, investmentReturn, appreciation])
 
   const rentingWins = result.difference > 0
 
@@ -604,7 +679,7 @@ function RentFinanceCalculator() {
       <NumericField label="Aluguel mensal" value={rent} onChange={setRent} suffix="R$" />
       <NumericField label="Entrada disponível" value={down} onChange={setDown} suffix="R$" />
       <NumericField label="Juros do financiamento" value={financeRate} onChange={setFinanceRate} suffix="% a.a." />
-      <NumericField label="Prazo de comparação" value={years} onChange={setYears} suffix="anos" step="1" />
+      <DurationField label="Prazo de comparação" value={term} onChange={setTerm} unit={termUnit} onUnitChange={setTermUnit} />
       <NumericField label="Retorno dos investimentos" value={investmentReturn} onChange={setInvestmentReturn} suffix="% a.a." />
       <NumericField label="Valorização do imóvel" value={appreciation} onChange={setAppreciation} suffix="% a.a." />
     </CalculatorShell>
@@ -645,13 +720,7 @@ export default function CalculatorsPage() {
 
   function selectCalculator(id) {
     setSelectedId(id)
-
-    if (
-      typeof window !== 'undefined' &&
-      window.matchMedia('(max-width: 900px)').matches
-    ) {
-      scrollToElement(workspaceRef)
-    }
+    scrollToElement(workspaceRef)
   }
 
   const filtered = useMemo(() => {

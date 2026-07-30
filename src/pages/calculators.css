@@ -710,3 +710,237 @@
     padding-inline: 9px;
   }
 }
+
+/* =========================================================
+   ETAPA V10.2 - MOBILE, ROLAGEM E UNIDADE DE PRAZO
+   ========================================================= */
+.calculators-page {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+.calculators-page > *,
+.calculators-hero,
+.calculators-hero .analytics-title-wrap,
+.calculators-hero .analytics-title-wrap > div:last-child,
+.calculator-library-panel,
+.calculator-toolbar,
+.calculator-card-copy,
+.calculator-workspace-anchor {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.calculators-hero h2,
+.calculators-hero p,
+.calculator-card-title-row strong,
+.calculator-card-copy > span:nth-child(2) {
+  overflow-wrap: anywhere;
+}
+
+.calculator-duration-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(104px, 0.48fr);
+  gap: 8px;
+  width: 100%;
+}
+
+.calculator-duration-control input,
+.calculator-duration-control select {
+  min-width: 0;
+}
+
+.calculator-duration-control select {
+  padding-right: 30px;
+  font-weight: 700;
+}
+
+@media (min-width: 901px) {
+  .calculator-workspace-anchor {
+    scroll-margin-top: 86px;
+  }
+}
+
+@media (max-width: 640px) {
+  .calculators-hero {
+    width: 100%;
+  }
+
+  .calculators-hero .analytics-title-wrap {
+    display: grid;
+    grid-template-columns: 43px minmax(0, 1fr);
+    align-items: start;
+    width: 100%;
+  }
+
+  .calculators-hero .analytics-title-wrap h2,
+  .calculators-hero .analytics-title-wrap p {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .calculators-hero .analytics-title-wrap h2 {
+    font-size: clamp(20px, 6.2vw, 25px);
+  }
+
+  .calculator-library-panel {
+    overflow: visible;
+  }
+
+  .calculator-search {
+    min-height: 48px;
+  }
+
+  .calculator-category-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 5px;
+    width: 100%;
+    margin: 0;
+    overflow: visible;
+  }
+
+  .calculator-category-tabs button {
+    width: 100%;
+    min-width: 0;
+    min-height: 42px;
+    padding: 8px 7px;
+    white-space: normal;
+    line-height: 1.2;
+    text-align: center;
+  }
+
+  .calculator-card {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .calculator-card-title-row {
+    flex-wrap: wrap;
+  }
+
+  .calculator-card-title-row small {
+    flex: 0 0 auto;
+  }
+
+  .calculator-mobile-context {
+    max-width: 100%;
+  }
+
+  .calculator-duration-control {
+    grid-template-columns: minmax(0, 1fr) 112px;
+  }
+
+  .calculator-duration-control input,
+  .calculator-duration-control select {
+    min-height: 48px;
+    font-size: 16px;
+  }
+
+  .calculator-results-panel .panel-header,
+  .calculator-form-panel .panel-header {
+    margin-bottom: 14px;
+  }
+
+  .calculator-results-panel .panel-header h2,
+  .calculator-form-panel .panel-header h2 {
+    font-size: 19px;
+    line-height: 1.25;
+  }
+
+  .calculator-results-panel .panel-header p,
+  .calculator-form-panel .panel-header p {
+    font-size: 12px;
+    line-height: 1.45;
+  }
+}
+
+@media (max-width: 430px) {
+  .calculators-page {
+    gap: 10px;
+  }
+
+  .calculators-hero,
+  .calculator-library-panel,
+  .calculator-form-panel,
+  .calculator-results-panel {
+    padding: 13px;
+    border-radius: 14px;
+  }
+
+  .calculators-hero .section-icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .calculators-hero .analytics-title-wrap {
+    grid-template-columns: 40px minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .calculators-hero p {
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .calculator-hero-stats {
+    gap: 5px;
+  }
+
+  .calculator-hero-stats div,
+  .calculator-hero-stats div:last-child {
+    padding: 8px 3px;
+  }
+
+  .calculator-hero-stats strong {
+    font-size: 16px;
+  }
+
+  .calculator-hero-stats span {
+    font-size: 9px;
+  }
+
+  .calculator-card {
+    grid-template-columns: 36px minmax(0, 1fr) 16px;
+    gap: 8px;
+    padding: 11px 10px;
+  }
+
+  .calculator-card-icon {
+    width: 36px;
+    height: 36px;
+  }
+
+  .calculator-card-copy > span:nth-child(2) {
+    -webkit-line-clamp: 1;
+  }
+
+  .calculator-duration-control {
+    grid-template-columns: minmax(0, 1fr) 104px;
+    gap: 6px;
+  }
+
+  .calculator-mobile-context {
+    top: 64px;
+    padding: 9px 10px;
+  }
+
+  .calculator-mobile-context button {
+    min-height: 36px;
+  }
+
+  .calculator-chart {
+    height: 230px;
+  }
+}
+
+@media (max-width: 350px) {
+  .calculator-category-tabs {
+    grid-template-columns: 1fr;
+  }
+
+  .calculator-duration-control {
+    grid-template-columns: 1fr;
+  }
+}
