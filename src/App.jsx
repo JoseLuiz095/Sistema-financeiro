@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import './mobile-ui.css'
-import Feedback from './components/Feedback'
+import GlobalToast from './components/GlobalToast'
 import AppIcon from './components/AppIcon'
 import { AnimatedPage, AppMotionProvider } from './components/AppMotion'
 import { supabase } from './lib/supabase'
@@ -43,6 +43,9 @@ import {
 import {
   calculateInvestmentPositions,
 } from './utils/investmentCalculator'
+import {
+  resetProtectedSessionCache,
+} from './services/assetAnalysisService'
 
 
 function decodeAuthToken(token) {
@@ -904,22 +907,31 @@ export default function App() {
         )
       }
 
-      const { data, error } =
-        await supabase.auth.getSession()
+      let verifiedSession = verification?.session ?? null
 
-      if (error || !data.session) {
-        throw (
-          error ??
-          new Error(
-            'A sessão autenticada não foi encontrada.',
+      if (!verifiedSession?.access_token) {
+        const {
+          data: refreshedData,
+          error: refreshError,
+        } = await supabase.auth.refreshSession()
+
+        if (refreshError || !refreshedData?.session) {
+          throw (
+            refreshError ??
+            new Error(
+              'A sessão autenticada não foi encontrada.',
+            )
           )
-        )
+        }
+
+        verifiedSession = refreshedData.session
       }
 
-      sessionRef.current = data.session
+      resetProtectedSessionCache()
+      sessionRef.current = verifiedSession
       mfaRequiredRef.current = false
       privateDataReadyRef.current = false
-      setSession(data.session)
+      setSession(verifiedSession)
       setMfaRequired(false)
       setCheckingMfa(false)
       setPrivateDataReady(false)
@@ -1220,11 +1232,12 @@ export default function App() {
         )}
       </nav>
 
-      <section className="app-content">
-        <div className="page-feedback">
-          <Feedback feedback={feedback} />
-        </div>
+      <GlobalToast
+        feedback={feedback}
+        onClose={() => setFeedback({ type: '', message: '' })}
+      />
 
+      <section className="app-content">
         <AnimatedPage
           pageKey={`${activePage}-${navigationRequest.key}`}
         >

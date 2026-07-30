@@ -60,6 +60,22 @@ export async function startTotpEnrollment(
   return data
 }
 
+function decodeSessionAal(session) {
+  try {
+    const payload = String(session?.access_token ?? '').split('.')[1]
+    if (!payload) return null
+
+    const normalized = payload
+      .replace(/-/g, '+')
+      .replace(/_/g, '/')
+      .padEnd(Math.ceil(payload.length / 4) * 4, '=')
+
+    return JSON.parse(window.atob(normalized))?.aal ?? null
+  } catch {
+    return null
+  }
+}
+
 export async function verifyTotpFactor(
   factorId,
   code,
@@ -86,29 +102,105 @@ export async function verifyTotpFactor(
 
   if (error) throw error
 
-  for (let attempt = 0; attempt < 10; attempt += 1) {
+  const challengeSession =
+    data?.session ??
+    (data?.access_token ? data : null)
+
+  if (
+    challengeSession?.access_token &&
+    challengeSession?.refresh_token &&
+    decodeSessionAal(challengeSession) === 'aal2'
+  ) {
+    const { data: setData, error: setError } =
+      await supabase.auth.setSession({
+        access_token: challengeSession.access_token,
+        refresh_token: challengeSession.refresh_token,
+      })
+
+    if (setError) throw setError
+
+    const storedSession =
+      setData?.session ?? challengeSession
+
+    return {
+      ...data,
+      session: storedSession,
+      aal: {
+        currentLevel: 'aal2',
+        nextLevel: 'aal2',
+      },
+    }
+  }
+
+  for (let attempt = 0; attempt < 12; attempt += 1) {
     const {
-      data: aalData,
-      error: aalError,
-    } = await supabase.auth.mfa
-      .getAuthenticatorAssuranceLevel()
+      data: sessionData,
+      error: sessionError,
+    } = await supabase.auth.getSession()
 
-    if (aalError) throw aalError
+    if (sessionError) throw sessionError
 
-    if (aalData?.currentLevel === 'aal2') {
-      return {
-        ...data,
-        aal: aalData,
+    const session = sessionData?.session ?? null
+
+    if (session?.access_token) {
+      const {
+        data: aalData,
+        error: aalError,
+      } = await supabase.auth.mfa
+        .getAuthenticatorAssuranceLevel(
+          session.access_token,
+        )
+
+      if (aalError) throw aalError
+
+      if (
+        aalData?.currentLevel === 'aal2' &&
+        decodeSessionAal(session) === 'aal2'
+      ) {
+        return {
+          ...data,
+          session,
+          aal: aalData,
+        }
       }
     }
 
     await new Promise((resolve) => {
-      setTimeout(resolve, 150)
+      window.setTimeout(resolve, 180)
     })
   }
 
+  const {
+    data: refreshedData,
+    error: refreshError,
+  } = await supabase.auth.refreshSession()
+
+  if (refreshError) throw refreshError
+
+  const refreshedSession = refreshedData?.session ?? null
+  const {
+    data: finalAal,
+    error: finalAalError,
+  } = await supabase.auth.mfa
+    .getAuthenticatorAssuranceLevel(
+      refreshedSession?.access_token,
+    )
+
+  if (finalAalError) throw finalAalError
+
+  if (
+    finalAal?.currentLevel === 'aal2' &&
+    decodeSessionAal(refreshedSession) === 'aal2'
+  ) {
+    return {
+      ...data,
+      session: refreshedSession,
+      aal: finalAal,
+    }
+  }
+
   throw new Error(
-    'O segundo fator foi validado, mas a sessão não chegou ao nível AAL2.',
+    'O segundo fator foi validado, mas a sessão segura não foi atualizada. Entre novamente e repita a confirmação.',
   )
 }
 

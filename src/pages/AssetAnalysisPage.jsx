@@ -292,6 +292,7 @@ export default function AssetAnalysisPage({
   const [ticker, setTicker] = useState('PETR4')
   const [marketAssets, setMarketAssets] = useState([])
   const [loadingCatalog, setLoadingCatalog] = useState(true)
+  const [catalogError, setCatalogError] = useState('')
   const [catalogOpen, setCatalogOpen] = useState(false)
   const [catalogFilter, setCatalogFilter] = useState('portfolio')
   const [catalogSearch, setCatalogSearch] = useState('')
@@ -299,6 +300,7 @@ export default function AssetAnalysisPage({
   const [analysis, setAnalysis] = useState(null)
   const [loading, setLoading] = useState(false)
   const [loadingSupplement, setLoadingSupplement] = useState(false)
+  const catalogRequestRef = useRef(0)
   const analysisRequestRef = useRef(0)
   const [aiResult, setAiResult] = useState(null)
   const [loadingAi, setLoadingAi] = useState(false)
@@ -337,9 +339,19 @@ export default function AssetAnalysisPage({
       )
 
       if (ticker && !values.has(ticker)) {
+        const source = position.position_source || 'OPEN_FINANCE'
+        const type = String(
+          position.investment_type || 'STOCK',
+        ).toLowerCase()
+
         values.set(ticker, {
           ticker,
           label: `${ticker} - ${position.investment_name || ticker}`,
+          name: position.investment_name || ticker,
+          type,
+          source,
+          movementCount:
+            position.statement_movement_count ?? 0,
         })
       }
     })
@@ -370,13 +382,17 @@ export default function AssetAnalysisPage({
 
     tickerOptions.forEach((item) => {
       if (!values.has(item.ticker)) {
+        const normalizedType = String(item.type || 'stock')
+          .toLowerCase()
+
         values.set(item.ticker, {
           symbol: item.ticker,
-          name: item.label.replace(`${item.ticker} - `, ''),
-          type: 'stock',
-          subType: 'stock',
+          name: item.name || item.ticker,
+          type: normalizedType,
+          subType: normalizedType,
           sector: null,
-          source: 'portfolio',
+          source: item.source || 'portfolio',
+          movementCount: item.movementCount ?? 0,
         })
       }
     })
@@ -473,31 +489,56 @@ export default function AssetAnalysisPage({
     }
   }, [tickerOptions, ticker])
 
-  useEffect(() => {
-    let active = true
+  async function loadCatalog(forceRefresh = false) {
+    const requestId = catalogRequestRef.current + 1
+    catalogRequestRef.current = requestId
+    setLoadingCatalog(true)
+    setCatalogError('')
 
-    async function loadCatalog() {
-      setLoadingCatalog(true)
+    try {
+      const rows = await listMarketAssets({ forceRefresh })
+      if (catalogRequestRef.current !== requestId) return
 
-      try {
-        const rows = await listMarketAssets()
-        if (active) setMarketAssets(rows)
-      } catch (error) {
-        if (active) {
-          setFeedback({
-            type: 'error',
-            message: `Falha ao carregar o catálogo da B3: ${error.message}`,
-          })
-        }
-      } finally {
-        if (active) setLoadingCatalog(false)
+      setMarketAssets(rows)
+      setFeedback({ type: '', message: '' })
+    } catch (error) {
+      if (catalogRequestRef.current !== requestId) return
+
+      const message =
+        error?.message ||
+        'Não foi possível carregar o catálogo de ativos.'
+
+      const userMessage =
+        `Não foi possível carregar os ativos da B3. ${message}`
+
+      setCatalogError(message)
+
+      const hasImportedAssets = tickerOptions.length > 0
+      const feedbackType = hasImportedAssets ? 'info' : 'error'
+      const visibleMessage = hasImportedAssets
+        ? 'O catálogo online da B3 está indisponível, mas os ativos identificados no seu extrato continuam disponíveis.'
+        : userMessage
+
+      setFeedback({
+        type: feedbackType,
+        message: visibleMessage,
+      })
+      setGlobalFeedback?.({
+        type: feedbackType,
+        message: visibleMessage,
+      })
+    } finally {
+      if (catalogRequestRef.current === requestId) {
+        setLoadingCatalog(false)
       }
     }
+  }
 
+  useEffect(() => {
     loadCatalog()
 
     return () => {
-      active = false
+      catalogRequestRef.current += 1
     }
   }, [])
 
@@ -867,6 +908,8 @@ export default function AssetAnalysisPage({
           </button>
         </form>
 
+       
+
         {catalogOpen && (
           <section className="asset-catalog" id="asset-market-catalog">
             <div className="asset-catalog-toolbar">
@@ -893,14 +936,44 @@ export default function AssetAnalysisPage({
               </label>
             </div>
 
-            {loadingCatalog ? (
+            {loadingCatalog && catalogAssets.length === 0 ? (
               <div className="asset-catalog-status">Carregando todos os ativos da B3...</div>
+            ) : catalogError && filteredCatalogAssets.length === 0 ? (
+              <div className="asset-catalog-status asset-catalog-recovery">
+                <strong>O catálogo não foi carregado.</strong>
+                <span>{catalogError}</span>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => loadCatalog(true)}
+                >
+                  Tentar carregar catálogo novamente
+                </button>
+              </div>
             ) : filteredCatalogAssets.length === 0 ? (
               <div className="asset-catalog-status">
                 Nenhum ativo encontrado neste filtro.
               </div>
             ) : (
               <>
+                {catalogError && (
+                  <div className="asset-catalog-local-warning" role="status">
+                    <div>
+                      <strong>Ativos do extrato disponíveis</strong>
+                      <span>
+                        O catálogo online não respondeu. Você ainda pode selecionar e analisar os ativos identificados na importação.
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={() => loadCatalog(true)}
+                    >
+                      Tentar carregar catálogo
+                    </button>
+                  </div>
+                )}
+
                 <div className="asset-catalog-grid">
                   {filteredCatalogAssets
                     .slice(0, catalogVisibleCount)
@@ -918,6 +991,11 @@ export default function AssetAnalysisPage({
                         <small>
                           {getCatalogTypeLabel(item)}
                           {item.sector ? ` · ${item.sector}` : ''}
+                          {item.source === 'STATEMENT_IMPORT'
+                            ? ' · Extrato importado'
+                            : item.source === 'REGISTERED_ASSET'
+                              ? ' · Identificado no extrato'
+                              : ''}
                         </small>
                       </button>
                     ))}

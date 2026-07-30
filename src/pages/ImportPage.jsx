@@ -72,13 +72,14 @@ export default function ImportPage({
 }) {
   const fileInputRef = useRef(null)
   const reviewRef = useRef(null)
+  const mountedRef = useRef(true)
   const [step, setStep] = useState('file')
   const [accountId, setAccountId] = useState(
     accounts[0]?.id ?? '',
   )
   const [parsedFile, setParsedFile] = useState(null)
   const [rows, setRows] = useState([])
-  const [reprocess, setReprocess] = useState(false)
+  const [reprocess, setReprocess] = useState(true)
   const [loading, setLoading] = useState(false)
   const [dragging, setDragging] = useState(false)
   const [showAccountForm, setShowAccountForm] = useState(
@@ -97,6 +98,17 @@ export default function ImportPage({
     stage: '',
   })
   const [result, setResult] = useState(null)
+  const [panelRefreshState, setPanelRefreshState] =
+    useState('idle')
+  const [completedAt, setCompletedAt] = useState(null)
+
+  useEffect(() => {
+    mountedRef.current = true
+
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
 
   useEffect(() => {
     if (!accountId && accounts[0]?.id) {
@@ -384,16 +396,30 @@ export default function ImportPage({
 
       setProgress({
         percent: 100,
-        stage: 'Atualizando painéis e análises',
+        stage: 'Importação concluída',
       })
-      await onChanged(true)
-
       setResult(importResult)
+      setCompletedAt(new Date())
       setStep('done')
+      setPanelRefreshState('refreshing')
       setFeedback({
         type: 'success',
         message: `Importação concluída com ${importResult.transactionCount.toLocaleString('pt-BR')} movimentações e ${importResult.investmentMovementCount.toLocaleString('pt-BR')} registros relacionados a investimentos.`,
       })
+
+      Promise.resolve()
+        .then(() => onChanged(true))
+        .then(() => {
+          if (mountedRef.current) {
+            setPanelRefreshState('ready')
+          }
+        })
+        .catch((refreshError) => {
+          console.error('[IMPORT][REFRESH_PANELS]', refreshError)
+          if (mountedRef.current) {
+            setPanelRefreshState('warning')
+          }
+        })
     } catch (error) {
       setStep('review')
       setFeedback({
@@ -414,6 +440,9 @@ export default function ImportPage({
     setFilter('all')
     setPage(1)
     setProgress({ percent: 0, stage: '' })
+    setPanelRefreshState('idle')
+    setCompletedAt(null)
+    setReprocess(true)
   }
 
   function downloadCsvTemplate() {
@@ -558,13 +587,7 @@ export default function ImportPage({
                 {parsedFile.fileName} · {rows.length.toLocaleString('pt-BR')} movimentações · {parsedFile.layout}
               </p>
             </div>
-            <button
-              type="button"
-              className="text-button"
-              onClick={restartImport}
-            >
-              Trocar arquivo
-            </button>
+            
           </div>
 
           {accounts.length > 0 && !showAccountForm && (
@@ -673,6 +696,15 @@ export default function ImportPage({
                 {showAccountForm ? 'Cancelar nova conta' : 'Criar outra conta'}
               </button>
             )}
+
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <button
+              type="button"
+              className="secondary-button import-back-button"
+              onClick={restartImport}
+            >
+              ← Voltar
+            </button>
             <button
               type="button"
               className="primary-button"
@@ -681,6 +713,8 @@ export default function ImportPage({
             >
               Continuar para revisão
             </button>
+            </div>
+            
           </div>
         </section>
       )}
@@ -741,10 +775,10 @@ export default function ImportPage({
                 </div>
                 <button
                   type="button"
-                  className="text-button"
+                  className="secondary-button import-back-button"
                   onClick={() => setStep('account')}
                 >
-                  Voltar para conta
+                  ← Voltar
                 </button>
               </div>
 
@@ -1032,6 +1066,28 @@ export default function ImportPage({
             {result.transactionCount.toLocaleString('pt-BR')} movimentações foram adicionadas. O sistema identificou {result.investmentMovementCount.toLocaleString('pt-BR')} registros relacionados a investimentos.
           </p>
 
+          <div
+            className={`import-refresh-status import-refresh-${panelRefreshState}`}
+            aria-live="polite"
+          >
+            <strong>
+              {panelRefreshState === 'refreshing'
+                ? 'Importação confirmada. Atualizando os painéis em segundo plano...'
+                : panelRefreshState === 'warning'
+                  ? 'Importação confirmada. Use Atualizar dados no topo caso algum painel ainda não tenha recarregado.'
+                  : 'Importação confirmada e painéis atualizados.'}
+            </strong>
+            {completedAt && (
+              <span>
+                Finalizada às {completedAt.toLocaleTimeString('pt-BR', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit',
+                })}.
+              </span>
+            )}
+          </div>
+
           <div className="summary-grid import-result-grid">
             <article className="summary-card">
               <span>Movimentações</span>
@@ -1064,7 +1120,7 @@ export default function ImportPage({
             </button>
             <button
               type="button"
-              className="text-button"
+              className="secondary-button import-back-button"
               onClick={restartImport}
             >
               Importar outro arquivo

@@ -46,7 +46,13 @@ async function createOrResetImport({
   accountId,
   parsedFile,
   reprocess,
+  onProgress = null,
 }) {
+  onProgress?.({
+    percent: 3,
+    stage: 'Validando o arquivo e importações anteriores',
+  })
+
   const existing = await findImportByHash(
     userId,
     parsedFile.fileHash,
@@ -58,7 +64,17 @@ async function createOrResetImport({
     )
   }
 
+  const dates = parsedFile.rows
+    .map((row) => row.date)
+    .filter(Boolean)
+    .sort()
+
   if (existing) {
+    onProgress?.({
+      percent: 5,
+      stage: 'Removendo os registros da importação anterior',
+    })
+
     const { error: incomeDeleteError } = await supabase
       .from('investment_income')
       .delete()
@@ -78,6 +94,8 @@ async function createOrResetImport({
         file_name: parsedFile.fileName,
         file_type: parsedFile.fileType,
         institution_detected: parsedFile.layout,
+        period_start: dates[0] ?? null,
+        period_end: dates.at(-1) ?? null,
         total_records: 0,
         status: 'PROCESSING',
         error_message: null,
@@ -86,13 +104,19 @@ async function createOrResetImport({
       .select()
       .single()
     if (error) throw error
+
+    onProgress?.({
+      percent: 7,
+      stage: 'Importação anterior preparada para substituição',
+    })
+
     return data
   }
 
-  const dates = parsedFile.rows
-    .map((row) => row.date)
-    .filter(Boolean)
-    .sort()
+  onProgress?.({
+    percent: 7,
+    stage: 'Criando o controle da importação',
+  })
 
   const { data, error } = await supabase
     .from('imports')
@@ -224,6 +248,7 @@ export async function importFinancialRows({
       rows: selectedRows,
     },
     reprocess,
+    onProgress,
   })
 
   try {

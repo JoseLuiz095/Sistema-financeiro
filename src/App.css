@@ -2796,3 +2796,280 @@ body {
   --text-color: #182230;
   --text-muted: #69778b;
 }
+
+/* V10.4 - confirmação de importação e crédito vindo do extrato */
+.import-refresh-status {
+  display: grid;
+  width: min(760px, 100%);
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid #b9d5c8;
+  border-radius: 14px;
+  background: #f0faf5;
+  color: #176545;
+  text-align: left;
+}
+
+.import-refresh-status span {
+  color: #527264;
+  font-size: 13px;
+}
+
+.import-refresh-refreshing {
+  border-color: #bfd5ec;
+  background: #f2f7fd;
+  color: #155a9e;
+}
+
+.import-refresh-warning {
+  border-color: #ead4a5;
+  background: #fff9ed;
+  color: #875b0d;
+}
+
+.debt-source-status-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.debt-source-status-grid > article {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: 14px;
+  background: #f7fafe;
+}
+
+.debt-source-status-grid > article > div {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.debt-source-status-grid strong,
+.debt-source-status-grid span {
+  overflow-wrap: anywhere;
+}
+
+.debt-source-status-grid > article > div span {
+  color: #627086;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.debt-installment-list {
+  display: grid;
+  gap: 10px;
+}
+
+.debt-installment-list > article {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(180px, 0.8fr) minmax(150px, auto);
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  padding: 14px 0;
+  border-bottom: 1px solid #e7edf4;
+}
+
+.debt-installment-list > article:last-child {
+  border-bottom: 0;
+}
+
+.debt-installment-main,
+.debt-installment-progress {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.debt-installment-main strong {
+  overflow-wrap: anywhere;
+}
+
+.debt-installment-main span,
+.debt-installment-progress span {
+  color: #6b7789;
+  font-size: 12px;
+}
+
+.debt-installment-progress strong {
+  color: #2d4e73;
+  font-size: 13px;
+}
+
+.debt-imported-grid {
+  align-items: start;
+}
+
+.warning-text {
+  color: #a66a08 !important;
+}
+
+@media (max-width: 900px) {
+  .debt-source-status-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .debt-installment-list > article {
+    grid-template-columns: minmax(0, 1fr) minmax(140px, auto);
+  }
+
+  .debt-installment-progress {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+@media (max-width: 620px) {
+  .import-refresh-status {
+    padding: 12px 13px;
+  }
+
+  .debt-source-status-grid > article {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .debt-source-status-grid > article > .badge {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .debt-installment-list > article {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 14px 0;
+  }
+
+  .debt-installment-progress {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .debt-installment-list .debt-list-value {
+    width: 100%;
+    text-align: left;
+  }
+}
+
+/* V10.5 - mensagens globais sempre visíveis */
+.global-toast {
+  position: fixed;
+  top: max(18px, env(safe-area-inset-top));
+  right: 18px;
+  z-index: 10050;
+  width: min(440px, calc(100vw - 36px));
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 14px 14px 16px;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  box-shadow: 0 18px 48px rgba(16, 24, 40, 0.22);
+  backdrop-filter: blur(12px);
+  animation: global-toast-enter 180ms ease-out;
+}
+
+.global-toast-content {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+}
+
+.global-toast-content p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.global-toast-icon {
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.global-toast-success {
+  color: #075d42;
+  border-color: #8ed6bc;
+  background: rgba(235, 250, 244, 0.98);
+}
+
+.global-toast-success .global-toast-icon {
+  color: #ffffff;
+  background: #0b7a55;
+}
+
+.global-toast-error {
+  color: #8b1e1e;
+  border-color: #ef9f9f;
+  background: rgba(255, 239, 239, 0.98);
+}
+
+.global-toast-error .global-toast-icon {
+  color: #ffffff;
+  background: #c93636;
+}
+
+.global-toast-info {
+  color: #124d8a;
+  border-color: #9ec7ef;
+  background: rgba(238, 247, 255, 0.98);
+}
+
+.global-toast-info .global-toast-icon {
+  color: #ffffff;
+  background: #1768b5;
+}
+
+.global-toast-close {
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: currentColor;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.global-toast-close:hover {
+  background: rgba(15, 23, 42, 0.08);
+}
+
+@keyframes global-toast-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 640px) {
+  .global-toast {
+    top: max(10px, env(safe-area-inset-top));
+    right: 10px;
+    left: 10px;
+    width: auto;
+  }
+}

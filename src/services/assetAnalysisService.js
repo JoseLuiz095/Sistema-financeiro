@@ -1,9 +1,11 @@
-import {
-  FunctionsFetchError,
-  FunctionsHttpError,
-  FunctionsRelayError,
-} from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
+
+const SUPABASE_URL = String(
+  import.meta.env.VITE_SUPABASE_URL ?? '',
+).replace(/\/+$/, '')
+const SUPABASE_PUBLISHABLE_KEY = String(
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? '',
+)
 
 const CACHE_TTL = {
   catalog: 30 * 60 * 1000,
@@ -14,6 +16,175 @@ const CACHE_TTL = {
 
 const memoryCache = new Map()
 const inFlightRequests = new Map()
+
+const PROTECTED_SESSION_TTL = 45 * 1000
+let protectedSessionCache = {
+  accessToken: '',
+  expiresAt: 0,
+}
+let protectedSessionRequest = null
+
+class ProtectedFunctionError extends Error {
+  constructor(message, { status = 0, payload = null } = {}) {
+    super(message)
+    this.name = 'ProtectedFunctionError'
+    this.status = status
+    this.payload = payload
+    this.code = payload?.code ?? null
+  }
+}
+
+function createAuthError(message, code) {
+  const error = new Error(message)
+  error.code = code
+  return error
+}
+
+export function resetProtectedSessionCache() {
+  protectedSessionCache = {
+    accessToken: '',
+    expiresAt: 0,
+  }
+  protectedSessionRequest = null
+}
+
+async function readSession({ forceRefresh = false } = {}) {
+  const { data: currentData, error: currentError } =
+    await supabase.auth.getSession()
+
+  if (currentError) throw currentError
+
+  let session = currentData?.session ?? null
+
+  if (!session?.access_token) {
+    throw createAuthError(
+      'Sua sessão expirou. Entre novamente para continuar.',
+      'session_not_found',
+    )
+  }
+
+  if (forceRefresh) {
+    const { data: refreshData, error: refreshError } =
+      await supabase.auth.refreshSession()
+
+    if (refreshError) throw refreshError
+    session = refreshData?.session ?? session
+  }
+
+  return session
+}
+
+async function getProtectedAccessToken({ forceRefresh = false } = {}) {
+  const now = Date.now()
+
+  if (
+    !forceRefresh &&
+    protectedSessionCache.accessToken &&
+    protectedSessionCache.expiresAt > now
+  ) {
+    return protectedSessionCache.accessToken
+  }
+
+  if (!forceRefresh && protectedSessionRequest) {
+    return protectedSessionRequest
+  }
+
+  const request = (async () => {
+    const session = await readSession({ forceRefresh })
+
+    protectedSessionCache = {
+      accessToken: session.access_token,
+      expiresAt: Date.now() + PROTECTED_SESSION_TTL,
+    }
+
+    return session.access_token
+  })().finally(() => {
+    protectedSessionRequest = null
+  })
+
+  protectedSessionRequest = request
+  return request
+}
+
+async function parseFunctionResponse(response) {
+  const raw = await response.text()
+  let payload = null
+
+  if (raw) {
+    try {
+      payload = JSON.parse(raw)
+    } catch {
+      payload = { message: raw }
+    }
+  }
+
+  if (!response.ok) {
+    throw new ProtectedFunctionError(
+      payload?.error ||
+        payload?.message ||
+        `A função respondeu com HTTP ${response.status}.`,
+      {
+        status: response.status,
+        payload,
+      },
+    )
+  }
+
+  return payload
+}
+
+async function invokeWithExactToken(functionName, body, accessToken) {
+  if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+    throw new Error(
+      'A configuração do Supabase não foi encontrada no frontend.',
+    )
+  }
+
+  const response = await fetch(
+    `${SUPABASE_URL}/functions/v1/${functionName}`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        apikey: SUPABASE_PUBLISHABLE_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body ?? {}),
+    },
+  )
+
+  return parseFunctionResponse(response)
+}
+
+async function invokeProtectedFunction(functionName, body) {
+  try {
+    let accessToken = await getProtectedAccessToken()
+
+    try {
+      const data = await invokeWithExactToken(
+        functionName,
+        body,
+        accessToken,
+      )
+      return { data, error: null }
+    } catch (error) {
+      if (![401, 403].includes(Number(error?.status))) {
+        throw error
+      }
+
+      resetProtectedSessionCache()
+      accessToken = await getProtectedAccessToken({ forceRefresh: true })
+      const data = await invokeWithExactToken(
+        functionName,
+        body,
+        accessToken,
+      )
+      return { data, error: null }
+    }
+  } catch (error) {
+    return { data: null, error }
+  }
+}
 
 function stableKey(value) {
   if (!value || typeof value !== 'object') return String(value ?? '')
@@ -54,21 +225,16 @@ async function cachedRequest(key, ttlMs, loader, { forceRefresh = false } = {}) 
 }
 
 async function extractFunctionError(error) {
-  if (error instanceof FunctionsHttpError) {
-    try {
-      const payload = await error.context.json()
-      return payload?.error || payload?.message || error.message
-    } catch {
-      return error.message
-    }
+  if (error instanceof ProtectedFunctionError) {
+    return (
+      error.payload?.error ||
+      error.payload?.message ||
+      error.message
+    )
   }
 
-  if (error instanceof FunctionsRelayError) {
-    return `Falha no relay da Edge Function: ${error.message}`
-  }
-
-  if (error instanceof FunctionsFetchError) {
-    return `Falha de rede ao consultar o mercado: ${error.message}`
+  if (error instanceof TypeError && /fetch/i.test(error.message)) {
+    return 'Falha de rede ao consultar o mercado. Verifique sua conexão.'
   }
 
   return error?.message || 'Falha ao consultar a análise do ativo.'
@@ -233,17 +399,15 @@ async function getBriefResearch({
     key,
     CACHE_TTL.research,
     async () => {
-      const { data, error } = await supabase.functions.invoke(
+      const { data, error } = await invokeProtectedFunction(
         'asset-ai-analysis',
         {
-          body: {
             action: 'research',
             ticker: normalizedTicker,
             assetType,
             assetSnapshot,
             forceRefresh,
           },
-        },
       )
 
       if (error) throw new Error(await extractFunctionError(error))
@@ -262,9 +426,9 @@ export async function listMarketAssets({ forceRefresh = false } = {}) {
     'catalog:b3',
     CACHE_TTL.catalog,
     async () => {
-      const { data, error } = await supabase.functions.invoke(
+      const { data, error } = await invokeProtectedFunction(
         'market-analysis',
-        { body: { action: 'catalog' } },
+        { action: 'catalog' },
       )
 
       if (error) throw new Error(await extractFunctionError(error))
@@ -292,14 +456,12 @@ export async function getAssetAnalysis(
     key,
     CACHE_TTL.overview,
     async () => {
-      const { data: response, error } = await supabase.functions.invoke(
+      const { data: response, error } = await invokeProtectedFunction(
         'market-analysis',
         {
-          body: {
-            action: 'overview',
-            ticker: normalizedTicker,
-            assumptions,
-          },
+          action: 'overview',
+          ticker: normalizedTicker,
+          assumptions,
         },
       )
 
@@ -370,14 +532,12 @@ export async function getAssetHistory(
     key,
     CACHE_TTL.history,
     async () => {
-      const { data, error } = await supabase.functions.invoke(
+      const { data, error } = await invokeProtectedFunction(
         'market-analysis',
         {
-          body: {
-            action: 'history',
-            ticker: normalizedTicker,
-            range,
-          },
+          action: 'history',
+          ticker: normalizedTicker,
+          range,
         },
       )
 
@@ -459,9 +619,9 @@ export async function deleteCostBasisAdjustment(id) {
 }
 
 export async function getAssetAiAnalysis(payload) {
-  const { data, error } = await supabase.functions.invoke(
+  const { data, error } = await invokeProtectedFunction(
     'asset-ai-analysis',
-    { body: payload },
+    payload,
   )
 
   if (error) throw new Error(await extractFunctionError(error))
