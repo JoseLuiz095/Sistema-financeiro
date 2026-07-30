@@ -30,6 +30,7 @@ import {
   formatNumber,
   formatPercent,
 } from '../utils/format'
+import { buildInvestmentInsights } from '../utils/investmentInsights'
 import {
   getConnectionDisplayName,
   getInvestmentBalance,
@@ -135,7 +136,7 @@ export default function DashboardPage({
   importedInvestmentPositions = [],
 }) {
   const isMobile = useMobileViewport()
-  const [monthlyRange, setMonthlyRange] = useState(12)
+  const [monthlyRange, setMonthlyRange] = useState(24)
   const [selectedCategory, setSelectedCategory] = useState(null)
   const [selectedAllocation, setSelectedAllocation] = useState(0)
   const currentMonth = new Date()
@@ -155,7 +156,7 @@ export default function DashboardPage({
   const monthly = useMemo(
     () => buildMonthlyFinancialSeries(
       transactions,
-      24,
+      120,
     ),
     [transactions],
   )
@@ -180,11 +181,18 @@ export default function DashboardPage({
 
 
 
+  const statementInvestments = useMemo(
+    () => buildInvestmentInsights(transactions),
+    [transactions],
+  )
+
   const monthlyView = useMemo(() => {
     let runningBalance = 0
-    return monthly
-      .slice(-monthlyRange)
-      .map((item) => {
+    const selectedMonths = monthlyRange > 0
+      ? monthly.slice(-monthlyRange)
+      : monthly
+
+    return selectedMonths.map((item) => {
         runningBalance += Number(item.surplus ?? 0)
         return {
           ...item,
@@ -204,24 +212,34 @@ export default function DashboardPage({
   )
 
   const allocation = useMemo(() => {
-    const groups = new Map()
+    if (importedPositions.length > 0) {
+      const groups = new Map()
 
-    importedPositions.forEach((position) => {
-      const label = getImportedInvestmentTypeLabel(
-        position.investment_type,
-        position.investment_subtype,
-      )
-      groups.set(
-        label,
-        (groups.get(label) ?? 0) + getInvestmentBalance(position),
-      )
-    })
+      importedPositions.forEach((position) => {
+        const label = getImportedInvestmentTypeLabel(
+          position.investment_type,
+          position.investment_subtype,
+        )
+        groups.set(
+          label,
+          (groups.get(label) ?? 0) + getInvestmentBalance(position),
+        )
+      })
 
-    return Array.from(groups.entries())
-      .map(([name, value]) => ({ name, value }))
-      .filter((item) => item.value > 0)
-      .sort((a, b) => b.value - a.value)
-  }, [importedPositions])
+      return Array.from(groups.entries())
+        .map(([name, value]) => ({ name, value }))
+        .filter((item) => item.value > 0)
+        .sort((a, b) => b.value - a.value)
+    }
+
+    return statementInvestments.assets
+      .filter((item) => item.estimatedBalance > 0)
+      .slice(0, 8)
+      .map((item) => ({
+        name: item.code || item.name,
+        value: item.estimatedBalance,
+      }))
+  }, [importedPositions, statementInvestments.assets])
 
   const allocationTotal = allocation.reduce(
     (total, item) => total + item.value,
@@ -304,47 +322,30 @@ export default function DashboardPage({
 
       <section className="summary-grid summary-grid-4">
         <article className="summary-card">
+          <span>Movimentações de investimento</span>
+          <strong>
+            {statementInvestments.summary.movementCount.toLocaleString('pt-BR')}
+          </strong>
+        </article>
+
+        <article className="summary-card">
+          <span>Total aportado no extrato</span>
+          <strong className="personal-private-value">
+            {formatCurrency(statementInvestments.summary.contributions)}
+          </strong>
+        </article>
+
+        <article className="summary-card">
+          <span>Rendimentos identificados</span>
+          <strong className="personal-private-value positive">
+            {formatCurrency(statementInvestments.summary.income)}
+          </strong>
+        </article>
+
+        <article className="summary-card">
           <span>Posições via Open Finance</span>
           <strong>
             {importedPositions.length}
-          </strong>
-        </article>
-
-        <article className="summary-card">
-          <span>
-            Saldo atual dos investimentos
-          </span>
-          <strong className="personal-private-value">
-            {formatCurrency(
-              investmentSummary.balance,
-            )}
-          </strong>
-        </article>
-
-        <article className="summary-card">
-          <span>
-            Valor originalmente informado
-          </span>
-          <strong className="personal-private-value">
-            {formatCurrency(
-              investmentSummary.original,
-            )}
-          </strong>
-        </article>
-
-        <article className="summary-card">
-          <span>Resultado informado</span>
-          <strong
-            className={
-              `personal-private-value ` +
-              (investmentSummary.profit >= 0
-                ? 'positive'
-                : 'negative')
-            }
-          >
-            {formatCurrency(
-              investmentSummary.profit,
-            )}
           </strong>
         </article>
       </section>
@@ -361,14 +362,20 @@ export default function DashboardPage({
               </div>
 
               <div className="chart-range-controls" role="group" aria-label="Período do gráfico">
-                {[6, 12, 24].map((range) => (
+                {[
+                  [6, '6m'],
+                  [12, '12m'],
+                  [24, '2a'],
+                  [60, '5a'],
+                  [0, 'Tudo'],
+                ].map(([range, label]) => (
                   <button
                     key={range}
                     type="button"
                     className={monthlyRange === range ? 'active' : ''}
                     onClick={() => setMonthlyRange(range)}
                   >
-                    {range}m
+                    {label}
                   </button>
                 ))}
               </div>
@@ -498,7 +505,11 @@ export default function DashboardPage({
           <section className="panel chart-panel interactive-chart-panel">
             <div className="panel-header">
               <h2>Distribuição dos investimentos</h2>
-              <p>Composição atual das posições importadas por tipo de ativo.</p>
+              <p>
+                {importedPositions.length > 0
+                  ? 'Composição atual das posições recebidas pelo Open Finance.'
+                  : 'Distribuição aproximada dos aportes líquidos identificados no extrato.'}
+              </p>
             </div>
 
             {allocation.length === 0 ? (
@@ -552,6 +563,7 @@ export default function DashboardPage({
         </div>
       </MotionReveal>
 
+      {importedPositions.length > 0 && (
       <section className="panel responsive-data-panel">
         <div className="panel-header">
           <h2>
@@ -799,6 +811,7 @@ export default function DashboardPage({
           )}
         </div>
       </section>
+      )}
     </div>
   )
 }

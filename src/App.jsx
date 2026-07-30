@@ -756,7 +756,7 @@ export default function App() {
             throw error
           }),
         ]),
-        25000,
+        60000,
         'O carregamento dos dados demorou além do esperado.',
       )
 
@@ -1261,6 +1261,7 @@ export default function App() {
             accounts={accounts}
             categories={categories}
             onChanged={loadAllData}
+            onNavigate={navigate}
             setFeedback={setFeedback}
           />
         )}

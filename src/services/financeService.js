@@ -57,19 +57,35 @@ export async function createCategory(payload) {
   return data
 }
 
-export async function listTransactions(limit = 5000) {
-  const { data, error } = await supabase
-    .from('transactions')
-    .select(`
-      *,
-      financial_accounts (id, institution, account_name),
-      categories (id, name, category_type)
-    `)
-    .order('transaction_date', { ascending: false })
-    .order('transaction_time', { ascending: false, nullsFirst: false })
-    .limit(limit)
-  if (error) throw error
-  return data ?? []
+export async function listTransactions(limit = 50000) {
+  const pageSize = 1000
+  const rows = []
+
+  for (let from = 0; from < limit; from += pageSize) {
+    const to = Math.min(from + pageSize - 1, limit - 1)
+    const { data, error } = await supabase
+      .from('transactions')
+      .select(`
+        *,
+        financial_accounts (id, institution, account_name),
+        categories (id, name, category_type)
+      `)
+      .order('transaction_date', { ascending: false })
+      .order('transaction_time', {
+        ascending: false,
+        nullsFirst: false,
+      })
+      .range(from, to)
+
+    if (error) throw error
+
+    const page = data ?? []
+    rows.push(...page)
+
+    if (page.length < pageSize) break
+  }
+
+  return rows
 }
 
 export async function createTransaction(payload) {

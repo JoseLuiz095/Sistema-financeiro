@@ -1,6 +1,6 @@
 import Papa from 'papaparse'
 import { normalizeText, parseBrazilianNumber } from './format'
-import { sha256File, sha256Text } from './hash'
+import { sha256File } from './hash'
 
 function normalizeHeader(value) {
   return normalizeText(value).replace(/\s+/g, '_')
@@ -57,6 +57,69 @@ function inferQuantityReference(description, ticker) {
   return match ? parseBrazilianNumber(match[1]) : null
 }
 
+function slugifyAsset(value) {
+  return normalizeText(value)
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toUpperCase()
+}
+
+function inferInvestmentAsset(description) {
+  const original = String(description ?? '').toUpperCase()
+  const normalized = normalizeText(original)
+  const ticker = inferTicker(original)
+
+  if (ticker) {
+    let type = ticker.endsWith('11') ? 'FII' : 'STOCK'
+    if (normalized.includes('etf')) type = 'ETF'
+    if (normalized.includes('acao')) type = 'STOCK'
+    if (normalized.includes('fii')) type = 'FII'
+
+    return {
+      code: ticker,
+      name: ticker,
+      type,
+      market: 'B3',
+    }
+  }
+
+  const cryptoMatch = normalized.match(/(?:cripto|crypto)\s+(btc|eth|sol|usdt|usdc|bnb)/i)
+  if (cryptoMatch) {
+    const code = cryptoMatch[1].toUpperCase()
+    return { code, name: `Cripto ${code}`, type: 'CRYPTO', market: 'CRYPTO' }
+  }
+
+  const fixedIncomePatterns = [
+    ['TESOURO SELIC', 'TREASURY'],
+    ['TESOURO IPCA', 'TREASURY'],
+    ['TESOURO PREFIXADO', 'TREASURY'],
+    ['CDB', 'FIXED_INCOME'],
+    ['LCI', 'FIXED_INCOME'],
+    ['LCA', 'FIXED_INCOME'],
+    ['DEBENTURE', 'FIXED_INCOME'],
+  ]
+
+  for (const [label, type] of fixedIncomePatterns) {
+    if (!normalized.includes(normalizeText(label))) continue
+    const detail = original
+      .replace(/.*?(APORTE|RENDIMENTO|RESGATE|VENDA)\s+/i, '')
+      .replace(/\|.*$/g, '')
+      .trim() || label
+    return {
+      code: slugifyAsset(detail).slice(0, 40),
+      name: detail,
+      type,
+      market: 'BR',
+    }
+  }
+
+  return null
+}
+
+function createRecordHash(fileHash, index, date, amount) {
+  return `${fileHash}:${index}:${date}:${Number(amount).toFixed(2)}`
+}
+
 function signAmount(type, rawAmount) {
   const absolute = Math.abs(rawAmount)
   const negativeTypes = new Set(['EXPENSE', 'OWN_TRANSFER_OUT', 'INVESTMENT_CONTRIBUTION'])
@@ -65,25 +128,95 @@ function signAmount(type, rawAmount) {
 
 function classifyInter(history, description, numericValue) {
   const text = normalizeText(`${history} ${description}`)
+
+  if (
+    text.includes('credito resgate investimento') ||
+    text.includes('resgate investimento') ||
+    text.includes('venda parcial') ||
+    text.includes('venda investimento')
+  ) {
+    return {
+      type: 'INVESTMENT_REDEMPTION',
+      category: null,
+      incomeType: null,
+      investmentEvent: 'REDEMPTION',
+    }
+  }
+
   if (text.includes('credito evento b3') || text.includes('credito b3 btb')) {
-    if (text.includes('dividend')) {
-      return { type: 'DIVIDEND', category: 'Dividendos e proventos', incomeType: 'DIVIDEND' }
+    if (text.includes('dividend') || text.includes('provento')) {
+      return {
+        type: 'DIVIDEND',
+        category: 'Dividendos e proventos',
+        incomeType: 'DIVIDEND',
+        investmentEvent: 'INCOME',
+      }
     }
     if (text.includes('rendimento')) {
-      return { type: 'FII_INCOME', category: 'Dividendos e proventos', incomeType: 'FII_INCOME' }
+      return {
+        type: 'FII_INCOME',
+        category: 'Dividendos e proventos',
+        incomeType: 'FII_INCOME',
+        investmentEvent: 'INCOME',
+      }
     }
     if (text.includes('aluguel')) {
-      return { type: 'INCOME', category: 'Rendimentos financeiros', incomeType: 'RENTAL' }
+      return {
+        type: 'INCOME',
+        category: 'Rendimentos financeiros',
+        incomeType: 'RENTAL',
+        investmentEvent: 'INCOME',
+      }
     }
-    return { type: 'INCOME', category: 'Rendimentos financeiros', incomeType: 'OTHER' }
+    return {
+      type: 'INCOME',
+      category: 'Rendimentos financeiros',
+      incomeType: 'OTHER',
+      investmentEvent: 'INCOME',
+    }
   }
-  if (text.includes('debito b3') || text.includes('nota bov')) {
-    return { type: 'INVESTMENT_CONTRIBUTION', category: null, incomeType: null }
+
+  if (
+    text.includes('taxa de custodia') ||
+    text.includes('taxa investimento') ||
+    text.includes('imposto investimento')
+  ) {
+    return {
+      type: 'EXPENSE',
+      category: 'Impostos e taxas',
+      incomeType: null,
+    }
   }
-  if (text.includes('pix recebido')) {
+
+  if (
+    text.includes('debito b3') ||
+    text.includes('nota bov') ||
+    text.includes('debito investimento')
+  ) {
+    return {
+      type: 'INVESTMENT_CONTRIBUTION',
+      category: null,
+      incomeType: null,
+      investmentEvent: 'CONTRIBUTION',
+    }
+  }
+
+  if (text.includes('transferencia entrada')) {
+    return { type: 'OWN_TRANSFER_IN', category: null, incomeType: null }
+  }
+  if (text.includes('transferencia saida')) {
+    return { type: 'OWN_TRANSFER_OUT', category: null, incomeType: null }
+  }
+  if (text.includes('pix recebido') || text.includes('credito salario')) {
     return { type: 'INCOME', category: 'Renda extra', incomeType: null }
   }
-  if (text.includes('pix enviado') || text.includes('pagamento efetuado')) {
+  if (
+    text.includes('pix enviado') ||
+    text.includes('pagamento efetuado') ||
+    text.includes('compra cartao') ||
+    text.includes('compra parcelada') ||
+    text.includes('pagamento')
+  ) {
     return { type: 'EXPENSE', category: 'Outras despesas', incomeType: null }
   }
   return {
@@ -157,6 +290,8 @@ export async function parseFinancialCsv(file) {
     let ticker = null
     let incomeType = null
     let quantityReference = null
+    let investmentAsset = null
+    let investmentEvent = null
 
     if (layout === 'INTER_B3') {
       const history = getValue(row, 'historico')
@@ -166,8 +301,10 @@ export async function parseFinancialCsv(file) {
       counterparty = detail
       rawAmount = parseBrazilianNumber(getValue(row, 'valor'))
       classification = classifyInter(history, detail, rawAmount)
-      ticker = inferTicker(detail)
+      investmentAsset = inferInvestmentAsset(detail)
+      ticker = investmentAsset?.code ?? inferTicker(detail)
       incomeType = classification.incomeType ?? null
+      investmentEvent = classification.investmentEvent ?? null
       quantityReference = inferQuantityReference(detail, ticker)
     } else if (layout === 'PICPAY') {
       const typeText = getValue(row, 'tipo')
@@ -193,8 +330,11 @@ export async function parseFinancialCsv(file) {
     if (!date || !description || !Number.isFinite(rawAmount) || rawAmount === 0) continue
 
     const signedAmount = signAmount(classification.type, rawAmount)
-    const rowHash = await sha256Text(
-      `${fileHash}|${index}|${date}|${time ?? ''}|${description}|${signedAmount}`,
+    const rowHash = createRecordHash(
+      fileHash,
+      index,
+      date,
+      signedAmount,
     )
 
     rows.push({
@@ -211,6 +351,8 @@ export async function parseFinancialCsv(file) {
       ticker,
       incomeType,
       quantityReference,
+      investmentAsset,
+      investmentEvent,
       recordHash: rowHash,
       sourceData: row,
       ignored: false,
@@ -380,8 +522,11 @@ export async function parseFinancialOfx(file) {
       classification.type,
       amount,
     )
-    const recordHash = await sha256Text(
-      `${fileHash}|${fitId || index}|${date}|${description}|${signedAmount}`,
+    const recordHash = createRecordHash(
+      fileHash,
+      fitId || index,
+      date,
+      signedAmount,
     )
 
     rows.push({
@@ -398,6 +543,8 @@ export async function parseFinancialOfx(file) {
       ticker: null,
       incomeType: null,
       quantityReference: null,
+      investmentAsset: null,
+      investmentEvent: null,
       recordHash,
       sourceData: {
         format: 'OFX',

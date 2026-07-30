@@ -3,6 +3,7 @@ import AppIcon from '../components/AppIcon'
 import AssetAnalysisPage from './AssetAnalysisPage'
 import DashboardPage from './DashboardPage'
 import DebtsPage from './DebtsPage'
+import InvestmentInsightsPage from './InvestmentInsightsPage'
 import ReportsPage from './ReportsPage'
 
 const SECTIONS = [
@@ -12,9 +13,14 @@ const SECTIONS = [
     icon: 'chart',
   },
   {
+    value: 'investments',
+    label: 'Investimentos',
+    icon: 'trend',
+  },
+  {
     value: 'assets',
     label: 'Análise de ativos',
-    icon: 'trend',
+    icon: 'analytics',
   },
   {
     value: 'debts',
@@ -49,27 +55,16 @@ export default function AnalyticsPage({
     <div className="page-stack analytics-page">
       <section className="analytics-heading panel-heading-surface">
         <div className="analytics-title-wrap">
-          <div
-            className="section-icon"
-            aria-hidden="true"
-          >
-            <AppIcon
-              name="analytics"
-              size={24}
-            />
+          <div className="section-icon" aria-hidden="true">
+            <AppIcon name="analytics" size={24} />
           </div>
 
           <div>
-            <span className="eyebrow">
-              Central de análises
-            </span>
-            <h2>
-              Dados financeiros consolidados em formato de BI
-            </h2>
+            <span className="eyebrow">Central de análises</span>
+            <h2>Seus dados organizados por objetivo</h2>
             <p>
-              Analise extratos, Open Finance, despesas,
-              crédito e ativos sem depender de lançamentos
-              manuais de patrimônio.
+              Acompanhe receitas, despesas, investimentos, crédito e
+              relatórios em visões separadas e fáceis de interpretar.
             </p>
           </div>
         </div>
@@ -78,31 +73,18 @@ export default function AnalyticsPage({
           className="sub-nav analytics-nav"
           aria-label="Seções de análises"
         >
-          {SECTIONS.map(
-            ({ value, label, icon }) => (
-              <button
-                key={value}
-                type="button"
-                className={
-                  section === value
-                    ? 'active'
-                    : ''
-                }
-                onClick={() => setSection(value)}
-                aria-current={
-                  section === value
-                    ? 'page'
-                    : undefined
-                }
-              >
-                <AppIcon
-                  name={icon}
-                  size={17}
-                />
-                <span>{label}</span>
-              </button>
-            ),
-          )}
+          {SECTIONS.map(({ value, label, icon }) => (
+            <button
+              key={value}
+              type="button"
+              className={section === value ? 'active' : ''}
+              onClick={() => setSection(value)}
+              aria-current={section === value ? 'page' : undefined}
+            >
+              <AppIcon name={icon} size={17} />
+              <span>{label}</span>
+            </button>
+          ))}
         </nav>
       </section>
 
@@ -115,20 +97,23 @@ export default function AnalyticsPage({
         />
       )}
 
+      {section === 'investments' && (
+        <InvestmentInsightsPage
+          transactions={transactions}
+          importedPositions={importedInvestmentPositions}
+        />
+      )}
+
       {section === 'assets' && (
         <AssetAnalysisPage
           user={user}
-          importedPositions={
-            importedInvestmentPositions
-          }
+          importedPositions={importedInvestmentPositions}
           setFeedback={setFeedback}
         />
       )}
 
       {section === 'debts' && (
-        <DebtsPage
-          setFeedback={setFeedback}
-        />
+        <DebtsPage setFeedback={setFeedback} />
       )}
 
       {section === 'reports' && (

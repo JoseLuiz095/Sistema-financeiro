@@ -1,4 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import {
   ACCOUNT_TYPES,
   TRANSACTION_TYPES,
@@ -7,6 +12,14 @@ import { createAccount } from '../services/financeService'
 import { importFinancialRows } from '../services/importService'
 import { parseFinancialFile } from '../utils/csvParsers'
 import { formatCurrency, formatDate } from '../utils/format'
+
+const PAGE_SIZE_OPTIONS = [25, 50, 100]
+const PENDING_IMPORT_STEPS = [
+  ['file', '1', 'Arquivo'],
+  ['account', '2', 'Conta'],
+  ['review', '3', 'Revisão'],
+  ['done', '4', 'Concluir'],
+]
 
 const initialAccountForm = {
   institution: '',
@@ -21,8 +34,32 @@ function getFriendlyImportError(error) {
   if (/nenhuma movimentação/i.test(message)) return message
   if (/já foi importado/i.test(message)) return message
 
-  return message ||
+  return (
+    message ||
     'Não foi possível ler o extrato. Confirme se o arquivo está em OFX, QFX ou CSV.'
+  )
+}
+
+function getStepIndex(step) {
+  if (step === 'importing') return 2
+  return PENDING_IMPORT_STEPS.findIndex(
+    ([value]) => value === step,
+  )
+}
+
+function isInvestmentRow(row) {
+  return Boolean(
+    row.investmentEvent ||
+      row.investmentAsset ||
+      row.incomeType ||
+      row.transactionType ===
+        'INVESTMENT_CONTRIBUTION' ||
+      row.transactionType ===
+        'INVESTMENT_REDEMPTION' ||
+      row.transactionType === 'DIVIDEND' ||
+      row.transactionType === 'FII_INCOME' ||
+      row.transactionType === 'INTEREST_ON_EQUITY',
+  )
 }
 
 export default function ImportPage({
@@ -30,9 +67,12 @@ export default function ImportPage({
   accounts,
   categories,
   onChanged,
+  onNavigate,
   setFeedback,
 }) {
   const fileInputRef = useRef(null)
+  const reviewRef = useRef(null)
+  const [step, setStep] = useState('file')
   const [accountId, setAccountId] = useState(
     accounts[0]?.id ?? '',
   )
@@ -48,6 +88,15 @@ export default function ImportPage({
   const [accountForm, setAccountForm] = useState(
     initialAccountForm,
   )
+  const [search, setSearch] = useState('')
+  const [filter, setFilter] = useState('all')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(50)
+  const [progress, setProgress] = useState({
+    percent: 0,
+    stage: '',
+  })
+  const [result, setResult] = useState(null)
 
   useEffect(() => {
     if (!accountId && accounts[0]?.id) {
@@ -57,19 +106,81 @@ export default function ImportPage({
 
   const totals = useMemo(
     () =>
-      rows
-        .filter((row) => !row.ignored)
-        .reduce(
-          (acc, row) => {
-            if (row.amount >= 0) acc.credits += row.amount
-            else acc.debits += Math.abs(row.amount)
-            if (row.needsReview) acc.review += 1
+      rows.reduce(
+        (acc, row) => {
+          if (row.ignored) {
+            acc.ignored += 1
             return acc
-          },
-          { credits: 0, debits: 0, review: 0 },
-        ),
+          }
+
+          acc.selected += 1
+          if (row.amount >= 0) acc.credits += row.amount
+          else acc.debits += Math.abs(row.amount)
+          if (row.needsReview) acc.review += 1
+          if (isInvestmentRow(row)) {
+            acc.investments += 1
+          }
+          return acc
+        },
+        {
+          selected: 0,
+          ignored: 0,
+          credits: 0,
+          debits: 0,
+          review: 0,
+          investments: 0,
+        },
+      ),
     [rows],
   )
+
+  const filteredRows = useMemo(() => {
+    const normalizedSearch = search.trim().toLowerCase()
+
+    return rows
+      .map((row, index) => ({ ...row, originalIndex: index }))
+      .filter((row) => {
+        if (filter === 'review' && !row.needsReview) return false
+        if (filter === 'investment' && !isInvestmentRow(row)) {
+          return false
+        }
+        if (filter === 'ignored' && !row.ignored) return false
+
+        if (!normalizedSearch) return true
+
+        return [
+          row.description,
+          row.counterparty,
+          row.ticker,
+          row.investmentAsset?.name,
+          row.transactionType,
+        ]
+          .filter(Boolean)
+          .some((value) =>
+            String(value)
+              .toLowerCase()
+              .includes(normalizedSearch),
+          )
+      })
+  }, [filter, rows, search])
+
+  const pageCount = Math.max(
+    1,
+    Math.ceil(filteredRows.length / pageSize),
+  )
+
+  useEffect(() => {
+    setPage(1)
+  }, [filter, pageSize, search])
+
+  useEffect(() => {
+    if (page > pageCount) setPage(pageCount)
+  }, [page, pageCount])
+
+  const visibleRows = useMemo(() => {
+    const start = (page - 1) * pageSize
+    return filteredRows.slice(start, start + pageSize)
+  }, [filteredRows, page, pageSize])
 
   async function processFile(file) {
     if (!file) return
@@ -77,42 +188,53 @@ export default function ImportPage({
     setLoading(true)
     setParsedFile(null)
     setRows([])
+    setResult(null)
+    setProgress({
+      percent: 5,
+      stage: 'Lendo o arquivo no seu dispositivo',
+    })
 
     try {
-      const result = await parseFinancialFile(file)
+      await new Promise((resolve) =>
+        window.setTimeout(resolve, 20),
+      )
+      const parsed = await parseFinancialFile(file)
       const categoryByName = new Map(
         categories.map((category) => [
           category.name,
           category.id,
         ]),
       )
-      const enriched = result.rows.map((row) => ({
+      const enriched = parsed.rows.map((row) => ({
         ...row,
         categoryId:
           categoryByName.get(row.categoryName) ?? '',
       }))
 
-      setParsedFile(result)
+      setParsedFile(parsed)
       setRows(enriched)
+      setProgress({ percent: 100, stage: 'Arquivo analisado' })
 
       if (
         accounts.length === 0 &&
-        result.institution &&
+        parsed.institution &&
         !accountForm.institution
       ) {
         setAccountForm({
-          institution: result.institution,
+          institution: parsed.institution,
           accountName: 'Conta principal',
           accountType: 'CHECKING',
         })
         setShowAccountForm(true)
       }
 
+      setStep('account')
       setFeedback({
         type: 'success',
-        message: `${enriched.length} movimentação(ões) reconhecida(s). Revise e confirme a importação.`,
+        message: `${enriched.length.toLocaleString('pt-BR')} movimentações foram reconhecidas. Agora escolha a conta de destino.`,
       })
     } catch (error) {
+      setProgress({ percent: 0, stage: '' })
       setFeedback({
         type: 'error',
         message: getFriendlyImportError(error),
@@ -136,26 +258,39 @@ export default function ImportPage({
   }
 
   function updateRow(index, field, value) {
-    setRows((current) =>
-      current.map((row, rowIndex) => {
-        if (rowIndex !== index) return row
+    setRows((current) => {
+      const next = [...current]
+      const row = current[index]
+      if (!row) return current
 
-        if (field === 'transactionType') {
-          const item = TRANSACTION_TYPES.find(
-            (type) => type.value === value,
-          )
-          const absolute = Math.abs(Number(row.amount))
+      if (field === 'transactionType') {
+        const item = TRANSACTION_TYPES.find(
+          (type) => type.value === value,
+        )
+        const absolute = Math.abs(Number(row.amount))
 
-          return {
-            ...row,
-            transactionType: value,
-            amount: absolute * (item?.direction ?? 1),
-            needsReview: false,
-          }
+        next[index] = {
+          ...row,
+          transactionType: value,
+          amount: absolute * (item?.direction ?? 1),
+          needsReview: false,
         }
+      } else {
+        next[index] = { ...row, [field]: value }
+      }
 
-        return { ...row, [field]: value }
-      }),
+      return next
+    })
+  }
+
+  function setVisibleRowsIgnored(ignored) {
+    const indexes = new Set(
+      filteredRows.map((row) => row.originalIndex),
+    )
+    setRows((current) =>
+      current.map((row, index) =>
+        indexes.has(index) ? { ...row, ignored } : row,
+      ),
     )
   }
 
@@ -191,9 +326,9 @@ export default function ImportPage({
       setShowAccountForm(false)
       setFeedback({
         type: 'success',
-        message: 'Conta criada. Agora confirme a importação do extrato.',
+        message: 'Conta criada e selecionada.',
       })
-      await onChanged()
+      await onChanged(true)
     } catch (error) {
       setFeedback({
         type: 'error',
@@ -206,9 +341,7 @@ export default function ImportPage({
     }
   }
 
-  async function confirmImport() {
-    if (!parsedFile) return
-
+  function continueToReview() {
     if (!accountId) {
       setShowAccountForm(true)
       setFeedback({
@@ -219,26 +352,50 @@ export default function ImportPage({
       return
     }
 
+    setStep('review')
+    window.setTimeout(() => {
+      reviewRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      })
+    }, 50)
+  }
+
+  async function confirmImport() {
+    if (!parsedFile || !accountId) return
+
     setLoading(true)
+    setStep('importing')
+    setProgress({
+      percent: 1,
+      stage: 'Iniciando a importação',
+    })
 
     try {
-      const result = await importFinancialRows({
+      const importResult = await importFinancialRows({
         userId: user.id,
         accountId,
         parsedFile,
         rows,
         categories,
         reprocess,
+        onProgress: setProgress,
       })
 
+      setProgress({
+        percent: 100,
+        stage: 'Atualizando painéis e análises',
+      })
+      await onChanged(true)
+
+      setResult(importResult)
+      setStep('done')
       setFeedback({
         type: 'success',
-        message: `Importação concluída: ${result.transactionCount} movimentações e ${result.incomeCount} proventos vinculados a ativos.`,
+        message: `Importação concluída com ${importResult.transactionCount.toLocaleString('pt-BR')} movimentações e ${importResult.investmentMovementCount.toLocaleString('pt-BR')} registros relacionados a investimentos.`,
       })
-      setParsedFile(null)
-      setRows([])
-      await onChanged()
     } catch (error) {
+      setStep('review')
       setFeedback({
         type: 'error',
         message: getFriendlyImportError(error),
@@ -248,11 +405,24 @@ export default function ImportPage({
     }
   }
 
+  function restartImport() {
+    setStep('file')
+    setParsedFile(null)
+    setRows([])
+    setResult(null)
+    setSearch('')
+    setFilter('all')
+    setPage(1)
+    setProgress({ percent: 0, stage: '' })
+  }
+
   function downloadCsvTemplate() {
     const content = [
       'data;descricao;valor',
       '30/07/2026;Salário;2500,00',
       '30/07/2026;Supermercado;-180,50',
+      '30/07/2026;APORTE ACAO PETR4;-500,00',
+      '30/07/2026;DIVIDENDO PETR4;35,00',
     ].join('\n')
     const blob = new Blob([`\uFEFF${content}`], {
       type: 'text/csv;charset=utf-8',
@@ -268,196 +438,259 @@ export default function ImportPage({
     URL.revokeObjectURL(url)
   }
 
+  const currentStepIndex = getStepIndex(step)
+
   return (
-    <div className="page-stack import-page">
-      <section className="panel import-start-panel">
+    <div className="page-stack import-page import-wizard-page">
+      <section className="panel import-wizard-header">
         <div className="panel-header">
-          <span className="eyebrow">Importação simples</span>
-          <h2>Envie o extrato do seu banco</h2>
+          <span className="eyebrow">Importação guiada</span>
+          <h2>Atualize seus dados em quatro etapas</h2>
           <p>
-            Prefira OFX ou QFX. CSV também é aceito. A leitura acontece
-            neste dispositivo e o arquivo original não é enviado ao servidor.
+            O sistema lê o arquivo, organiza as movimentações e mostra um
+            resumo antes de gravar. Arquivos grandes são exibidos em páginas
+            para não travar o navegador.
           </p>
         </div>
 
-        <div className="import-method-grid">
-          <button
-            type="button"
-            className={`import-drop-zone ${
-              dragging ? 'is-dragging' : ''
-            }`}
-            onClick={() => fileInputRef.current?.click()}
-            onDragEnter={(event) => {
-              event.preventDefault()
-              setDragging(true)
-            }}
-            onDragOver={(event) => event.preventDefault()}
-            onDragLeave={() => setDragging(false)}
-            onDrop={handleDrop}
-            disabled={loading}
-          >
-            <span className="import-drop-icon" aria-hidden="true">
-              ↑
-            </span>
-            <strong>
-              {loading
-                ? 'Lendo extrato...'
-                : 'Selecionar ou arrastar extrato'}
-            </strong>
-            <span>Formatos aceitos: OFX, QFX e CSV</span>
-            <small>Limite recomendado: até 10 MB</small>
-          </button>
-
-          <input
-            ref={fileInputRef}
-            className="visually-hidden-file-input"
-            type="file"
-            accept=".ofx,.qfx,.csv,text/csv,application/x-ofx,application/vnd.intu.qfx"
-            onChange={selectFile}
-          />
-
-          <div className="import-help-card">
-            <strong>Como obter o arquivo?</strong>
-            <ol>
-              <li>Abra o aplicativo ou internet banking.</li>
-              <li>Acesse Extrato e escolha o período.</li>
-              <li>Exporte em OFX, QFX ou CSV.</li>
-            </ol>
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={downloadCsvTemplate}
-            >
-              Baixar modelo CSV
-            </button>
-          </div>
-        </div>
-
-        <div className="import-security-note">
-          <strong>Privacidade:</strong>
-          <span>
-            senhas bancárias nunca são solicitadas. Somente as linhas que
-            você revisar e confirmar serão armazenadas no seu usuário.
-          </span>
-        </div>
+        <ol className="import-stepper" aria-label="Etapas da importação">
+          {PENDING_IMPORT_STEPS.map(
+            ([value, number, label], index) => (
+              <li
+                key={value}
+                className={
+                  index < currentStepIndex
+                    ? 'completed'
+                    : index === currentStepIndex
+                      ? 'active'
+                      : ''
+                }
+              >
+                <span>{index < currentStepIndex ? '✓' : number}</span>
+                <strong>{label}</strong>
+              </li>
+            ),
+          )}
+        </ol>
       </section>
 
-      <section className="panel import-account-panel">
-        <div className="panel-header row-between">
-          <div>
-            <h2>Conta de destino</h2>
-            <p>Escolha onde essas movimentações serão organizadas.</p>
+      {step === 'file' && (
+        <section className="panel import-start-panel">
+          <div className="panel-header">
+            <h2>1. Selecione o extrato</h2>
+            <p>
+              Prefira OFX ou QFX. CSV também é aceito. A leitura do arquivo
+              acontece neste dispositivo.
+            </p>
           </div>
-          {accounts.length > 0 && (
+
+          <div className="import-method-grid">
             <button
               type="button"
-              className="secondary-button"
-              onClick={() => setShowAccountForm((current) => !current)}
+              className={`import-drop-zone ${
+                dragging ? 'is-dragging' : ''
+              }`}
+              onClick={() => fileInputRef.current?.click()}
+              onDragEnter={(event) => {
+                event.preventDefault()
+                setDragging(true)
+              }}
+              onDragOver={(event) => event.preventDefault()}
+              onDragLeave={() => setDragging(false)}
+              onDrop={handleDrop}
+              disabled={loading}
             >
-              {showAccountForm ? 'Cancelar' : 'Criar outra conta'}
+              <span className="import-drop-icon" aria-hidden="true">
+                ↑
+              </span>
+              <strong>
+                {loading
+                  ? progress.stage || 'Lendo extrato...'
+                  : 'Selecionar ou arrastar extrato'}
+              </strong>
+              <span>Formatos aceitos: OFX, QFX e CSV</span>
+              <small>Arquivos extensos são processados sem listar tudo de uma vez.</small>
             </button>
-          )}
-        </div>
 
-        {accounts.length > 0 && !showAccountForm && (
-          <div className="import-controls import-controls-simple">
-            <label>
-              Conta
-              <select
-                value={accountId}
-                onChange={(event) => setAccountId(event.target.value)}
+            <input
+              ref={fileInputRef}
+              className="visually-hidden-file-input"
+              type="file"
+              accept=".ofx,.qfx,.csv,text/csv,application/x-ofx,application/vnd.intu.qfx"
+              onChange={selectFile}
+            />
+
+            <div className="import-help-card">
+              <strong>Sequência recomendada</strong>
+              <ol>
+                <li>Exporte o extrato no aplicativo do banco.</li>
+                <li>Escolha a conta de destino no sistema.</li>
+                <li>Revise somente os itens sinalizados.</li>
+                <li>Confirme e abra as análises.</li>
+              </ol>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={downloadCsvTemplate}
               >
-                <option value="">Selecione</option>
-                {accounts.map((account) => (
-                  <option key={account.id} value={account.id}>
-                    {account.institution} - {account.account_name}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                checked={reprocess}
-                onChange={(event) =>
-                  setReprocess(event.target.checked)
-                }
-              />
-              Substituir uma importação anterior deste mesmo arquivo
-            </label>
+                Baixar modelo CSV
+              </button>
+            </div>
           </div>
-        )}
 
-        {(showAccountForm || accounts.length === 0) && (
-          <form
-            className="form import-quick-account-form"
-            onSubmit={saveQuickAccount}
-          >
-            <div className="three-columns">
+          <div className="import-security-note">
+            <strong>Privacidade:</strong>
+            <span>
+              o arquivo original não é armazenado. Somente as movimentações
+              confirmadas são gravadas no seu usuário.
+            </span>
+          </div>
+        </section>
+      )}
+
+      {step === 'account' && parsedFile && (
+        <section className="panel import-account-panel">
+          <div className="panel-header row-between">
+            <div>
+              <span className="eyebrow">Arquivo reconhecido</span>
+              <h2>2. Escolha a conta de destino</h2>
+              <p>
+                {parsedFile.fileName} · {rows.length.toLocaleString('pt-BR')} movimentações · {parsedFile.layout}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="text-button"
+              onClick={restartImport}
+            >
+              Trocar arquivo
+            </button>
+          </div>
+
+          {accounts.length > 0 && !showAccountForm && (
+            <div className="import-controls import-controls-simple">
               <label>
-                Instituição
-                <input
-                  value={accountForm.institution}
-                  onChange={(event) =>
-                    setAccountForm({
-                      ...accountForm,
-                      institution: event.target.value,
-                    })
-                  }
-                  placeholder="Ex.: Inter, Sicoob ou PicPay"
-                  required
-                />
-              </label>
-              <label>
-                Nome da conta
-                <input
-                  value={accountForm.accountName}
-                  onChange={(event) =>
-                    setAccountForm({
-                      ...accountForm,
-                      accountName: event.target.value,
-                    })
-                  }
-                  placeholder="Ex.: Conta principal"
-                  required
-                />
-              </label>
-              <label>
-                Tipo
+                Conta
                 <select
-                  value={accountForm.accountType}
+                  value={accountId}
                   onChange={(event) =>
-                    setAccountForm({
-                      ...accountForm,
-                      accountType: event.target.value,
-                    })
+                    setAccountId(event.target.value)
                   }
                 >
-                  {ACCOUNT_TYPES.map((item) => (
-                    <option key={item.value} value={item.value}>
-                      {item.label}
+                  <option value="">Selecione</option>
+                  {accounts.map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {account.institution} - {account.account_name}
                     </option>
                   ))}
                 </select>
               </label>
-            </div>
-            <button
-              className="primary-button"
-              disabled={savingAccount}
-            >
-              {savingAccount ? 'Criando conta...' : 'Criar conta'}
-            </button>
-          </form>
-        )}
-      </section>
 
-      {parsedFile && (
-        <>
-          <section className="summary-grid summary-grid-4">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={reprocess}
+                  onChange={(event) =>
+                    setReprocess(event.target.checked)
+                  }
+                />
+                Substituir uma importação anterior deste mesmo arquivo
+              </label>
+            </div>
+          )}
+
+          {(showAccountForm || accounts.length === 0) && (
+            <form
+              className="form import-quick-account-form"
+              onSubmit={saveQuickAccount}
+            >
+              <div className="three-columns">
+                <label>
+                  Instituição
+                  <input
+                    value={accountForm.institution}
+                    onChange={(event) =>
+                      setAccountForm({
+                        ...accountForm,
+                        institution: event.target.value,
+                      })
+                    }
+                    placeholder="Ex.: Inter, Sicoob ou PicPay"
+                    required
+                  />
+                </label>
+                <label>
+                  Nome da conta
+                  <input
+                    value={accountForm.accountName}
+                    onChange={(event) =>
+                      setAccountForm({
+                        ...accountForm,
+                        accountName: event.target.value,
+                      })
+                    }
+                    placeholder="Ex.: Conta principal"
+                    required
+                  />
+                </label>
+                <label>
+                  Tipo
+                  <select
+                    value={accountForm.accountType}
+                    onChange={(event) =>
+                      setAccountForm({
+                        ...accountForm,
+                        accountType: event.target.value,
+                      })
+                    }
+                  >
+                    {ACCOUNT_TYPES.map((item) => (
+                      <option key={item.value} value={item.value}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <button
+                className="primary-button"
+                disabled={savingAccount}
+              >
+                {savingAccount ? 'Criando conta...' : 'Criar conta'}
+              </button>
+            </form>
+          )}
+
+          <div className="import-step-actions">
+            {accounts.length > 0 && (
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() =>
+                  setShowAccountForm((current) => !current)
+                }
+              >
+                {showAccountForm ? 'Cancelar nova conta' : 'Criar outra conta'}
+              </button>
+            )}
+            <button
+              type="button"
+              className="primary-button"
+              onClick={continueToReview}
+              disabled={!accountId}
+            >
+              Continuar para revisão
+            </button>
+          </div>
+        </section>
+      )}
+
+      {(step === 'review' || step === 'importing') && parsedFile && (
+        <div ref={reviewRef} className="page-stack">
+          <section className="summary-grid import-summary-grid">
             <article className="summary-card">
-              <span>Formato identificado</span>
-              <strong>{parsedFile.layout}</strong>
+              <span>Selecionadas</span>
+              <strong>{totals.selected.toLocaleString('pt-BR')}</strong>
             </article>
             <article className="summary-card">
               <span>Créditos</span>
@@ -468,212 +701,376 @@ export default function ImportPage({
               <strong>{formatCurrency(totals.debits)}</strong>
             </article>
             <article className="summary-card">
-              <span>Revisões</span>
-              <strong>{totals.review}</strong>
+              <span>Investimentos</span>
+              <strong>{totals.investments.toLocaleString('pt-BR')}</strong>
+            </article>
+            <article className="summary-card">
+              <span>Precisam de revisão</span>
+              <strong>{totals.review.toLocaleString('pt-BR')}</strong>
             </article>
           </section>
 
-          <section className="panel">
-            <div className="panel-header row-between">
-              <div>
-                <h2>Revise antes de salvar</h2>
-                <p>
-                  Altere tipo, categoria ou desmarque movimentações que
-                  não deseja importar.
-                </p>
-              </div>
-              <button
-                className="primary-button"
-                disabled={loading}
-                onClick={confirmImport}
+          {step === 'importing' ? (
+            <section className="panel import-progress-panel">
+              <div className="import-progress-icon" aria-hidden="true">↻</div>
+              <h2>Importando o extrato</h2>
+              <p>{progress.stage}</p>
+              <div
+                className="import-progress-track"
+                role="progressbar"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                aria-valuenow={progress.percent}
               >
-                {loading ? 'Importando...' : 'Confirmar importação'}
-              </button>
-            </div>
+                <span style={{ width: `${progress.percent}%` }} />
+              </div>
+              <strong>{progress.percent}%</strong>
+              <small>
+                Não feche esta página até a conclusão. A gravação ocorre em lotes para reduzir travamentos.
+              </small>
+            </section>
+          ) : (
+            <section className="panel import-review-panel">
+              <div className="panel-header row-between">
+                <div>
+                  <span className="eyebrow">Revisão paginada</span>
+                  <h2>3. Confira o resumo e os itens sinalizados</h2>
+                  <p>
+                    Não é necessário percorrer as {rows.length.toLocaleString('pt-BR')} linhas. Use os filtros e revise somente o necessário.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() => setStep('account')}
+                >
+                  Voltar para conta
+                </button>
+              </div>
 
-            <div className="table-wrapper import-table import-desktop-table">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Usar</th>
-                    <th>Data</th>
-                    <th>Descrição</th>
-                    <th>Tipo</th>
-                    <th>Categoria</th>
-                    <th>Valor</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row, index) => (
-                    <tr
-                      key={row.recordHash}
-                      className={row.ignored ? 'row-disabled' : ''}
-                    >
-                      <td>
+              <div className="import-review-toolbar">
+                <label className="import-search-field">
+                  Buscar
+                  <input
+                    type="search"
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder="Descrição, ativo ou tipo"
+                  />
+                </label>
+                <label>
+                  Mostrar
+                  <select
+                    value={filter}
+                    onChange={(event) => setFilter(event.target.value)}
+                  >
+                    <option value="all">Todas</option>
+                    <option value="review">Somente revisar</option>
+                    <option value="investment">Investimentos</option>
+                    <option value="ignored">Ignoradas</option>
+                  </select>
+                </label>
+                <label>
+                  Por página
+                  <select
+                    value={pageSize}
+                    onChange={(event) =>
+                      setPageSize(Number(event.target.value))
+                    }
+                  >
+                    {PAGE_SIZE_OPTIONS.map((value) => (
+                      <option key={value} value={value}>{value}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <div className="import-bulk-actions">
+                <span>
+                  {filteredRows.length.toLocaleString('pt-BR')} resultado(s)
+                </span>
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() => setVisibleRowsIgnored(false)}
+                >
+                  Incluir resultados
+                </button>
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() => setVisibleRowsIgnored(true)}
+                >
+                  Ignorar resultados
+                </button>
+              </div>
+
+              <div className="table-wrapper import-table import-desktop-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Usar</th>
+                      <th>Data</th>
+                      <th>Descrição</th>
+                      <th>Tipo</th>
+                      <th>Categoria</th>
+                      <th>Valor</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibleRows.map((row) => (
+                      <tr
+                        key={row.recordHash}
+                        className={row.ignored ? 'row-disabled' : ''}
+                      >
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={!row.ignored}
+                            onChange={(event) =>
+                              updateRow(
+                                row.originalIndex,
+                                'ignored',
+                                !event.target.checked,
+                              )
+                            }
+                          />
+                        </td>
+                        <td>
+                          {formatDate(row.date)}
+                          <small>{row.time}</small>
+                        </td>
+                        <td>
+                          {row.description}
+                          <small>
+                            {row.investmentAsset
+                              ? `Investimento: ${row.investmentAsset.name}`
+                              : row.ticker
+                                ? `Ativo: ${row.ticker}`
+                                : row.counterparty}
+                          </small>
+                        </td>
+                        <td>
+                          <select
+                            value={row.transactionType}
+                            onChange={(event) =>
+                              updateRow(
+                                row.originalIndex,
+                                'transactionType',
+                                event.target.value,
+                              )
+                            }
+                          >
+                            {TRANSACTION_TYPES.map((item) => (
+                              <option key={item.value} value={item.value}>
+                                {item.label}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td>
+                          <select
+                            value={row.categoryId}
+                            onChange={(event) =>
+                              updateRow(
+                                row.originalIndex,
+                                'categoryId',
+                                event.target.value,
+                              )
+                            }
+                          >
+                            <option value="">Sem categoria</option>
+                            {categories.map((category) => (
+                              <option key={category.id} value={category.id}>
+                                {category.name}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className={row.amount >= 0 ? 'positive' : 'negative'}>
+                          {formatCurrency(row.amount)}
+                        </td>
+                        <td>
+                          {isInvestmentRow(row) ? (
+                            <span className="badge info">Investimento</span>
+                          ) : row.needsReview ? (
+                            <span className="badge warning">Revisar</span>
+                          ) : (
+                            <span className="badge success">Pronto</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="import-mobile-list">
+                {visibleRows.map((row) => (
+                  <article
+                    key={`mobile-${row.recordHash}`}
+                    className={`import-mobile-card ${row.ignored ? 'row-disabled' : ''}`}
+                  >
+                    <div className="import-mobile-card-header">
+                      <label className="checkbox-label">
                         <input
                           type="checkbox"
                           checked={!row.ignored}
                           onChange={(event) =>
                             updateRow(
-                              index,
+                              row.originalIndex,
                               'ignored',
                               !event.target.checked,
                             )
                           }
                         />
-                      </td>
-                      <td>
-                        {formatDate(row.date)}
-                        <small>{row.time}</small>
-                      </td>
-                      <td>
-                        {row.description}
-                        <small>
-                          {row.ticker
-                            ? `Ativo: ${row.ticker}`
-                            : row.counterparty}
-                        </small>
-                      </td>
-                      <td>
-                        <select
-                          value={row.transactionType}
-                          onChange={(event) =>
-                            updateRow(
-                              index,
-                              'transactionType',
-                              event.target.value,
-                            )
-                          }
-                        >
-                          {TRANSACTION_TYPES.map((item) => (
-                            <option key={item.value} value={item.value}>
-                              {item.label}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td>
-                        <select
-                          value={row.categoryId}
-                          onChange={(event) =>
-                            updateRow(
-                              index,
-                              'categoryId',
-                              event.target.value,
-                            )
-                          }
-                        >
-                          <option value="">Sem categoria</option>
-                          {categories.map((category) => (
-                            <option
-                              key={category.id}
-                              value={category.id}
-                            >
-                              {category.name}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td
-                        className={
-                          row.amount >= 0 ? 'positive' : 'negative'
-                        }
-                      >
+                        Importar
+                      </label>
+                      <strong className={row.amount >= 0 ? 'positive' : 'negative'}>
                         {formatCurrency(row.amount)}
-                      </td>
-                      <td>
-                        {row.needsReview ? (
-                          <span className="badge warning">Revisar</span>
-                        ) : (
-                          <span className="badge success">Pronto</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="import-mobile-list">
-              {rows.map((row, index) => (
-                <article
-                  key={`mobile-${row.recordHash}`}
-                  className={`import-mobile-card ${
-                    row.ignored ? 'row-disabled' : ''
-                  }`}
-                >
-                  <div className="import-mobile-card-header">
-                    <label className="checkbox-label">
-                      <input
-                        type="checkbox"
-                        checked={!row.ignored}
+                      </strong>
+                    </div>
+                    <span className="import-mobile-date">
+                      {formatDate(row.date)} {row.time || ''}
+                    </span>
+                    <p>{row.description}</p>
+                    {isInvestmentRow(row) && (
+                      <span className="badge info">Investimento identificado</span>
+                    )}
+                    <label>
+                      Tipo
+                      <select
+                        value={row.transactionType}
                         onChange={(event) =>
                           updateRow(
-                            index,
-                            'ignored',
-                            !event.target.checked,
+                            row.originalIndex,
+                            'transactionType',
+                            event.target.value,
                           )
                         }
-                      />
-                      Importar
+                      >
+                        {TRANSACTION_TYPES.map((item) => (
+                          <option key={item.value} value={item.value}>
+                            {item.label}
+                          </option>
+                        ))}
+                      </select>
                     </label>
-                    <strong
-                      className={
-                        row.amount >= 0 ? 'positive' : 'negative'
-                      }
-                    >
-                      {formatCurrency(row.amount)}
-                    </strong>
-                  </div>
-                  <span className="import-mobile-date">
-                    {formatDate(row.date)} {row.time || ''}
+                    <label>
+                      Categoria
+                      <select
+                        value={row.categoryId}
+                        onChange={(event) =>
+                          updateRow(
+                            row.originalIndex,
+                            'categoryId',
+                            event.target.value,
+                          )
+                        }
+                      >
+                        <option value="">Sem categoria</option>
+                        {categories.map((category) => (
+                          <option key={category.id} value={category.id}>
+                            {category.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </article>
+                ))}
+              </div>
+
+              <div className="import-pagination">
+                <button
+                  type="button"
+                  className="secondary-button"
+                  disabled={page <= 1}
+                  onClick={() => setPage((current) => current - 1)}
+                >
+                  Anterior
+                </button>
+                <span>
+                  Página {page} de {pageCount}
+                </span>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  disabled={page >= pageCount}
+                  onClick={() => setPage((current) => current + 1)}
+                >
+                  Próxima
+                </button>
+              </div>
+
+              <div className="import-confirm-bar">
+                <div>
+                  <strong>{totals.selected.toLocaleString('pt-BR')} movimentações serão gravadas</strong>
+                  <span>
+                    Inclui {totals.investments.toLocaleString('pt-BR')} registro(s) de investimento.
                   </span>
-                  <p>{row.description}</p>
-                  <label>
-                    Tipo
-                    <select
-                      value={row.transactionType}
-                      onChange={(event) =>
-                        updateRow(
-                          index,
-                          'transactionType',
-                          event.target.value,
-                        )
-                      }
-                    >
-                      {TRANSACTION_TYPES.map((item) => (
-                        <option key={item.value} value={item.value}>
-                          {item.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    Categoria
-                    <select
-                      value={row.categoryId}
-                      onChange={(event) =>
-                        updateRow(
-                          index,
-                          'categoryId',
-                          event.target.value,
-                        )
-                      }
-                    >
-                      <option value="">Sem categoria</option>
-                      {categories.map((category) => (
-                        <option key={category.id} value={category.id}>
-                          {category.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </article>
-              ))}
-            </div>
-          </section>
-        </>
+                </div>
+                <button
+                  className="primary-button"
+                  disabled={loading || totals.selected === 0}
+                  onClick={confirmImport}
+                >
+                  Confirmar importação
+                </button>
+              </div>
+            </section>
+          )}
+        </div>
+      )}
+
+      {step === 'done' && result && (
+        <section className="panel import-success-panel">
+          <div className="import-success-icon" aria-hidden="true">✓</div>
+          <span className="eyebrow">Importação finalizada</span>
+          <h2>Seus dados já estão disponíveis</h2>
+          <p>
+            {result.transactionCount.toLocaleString('pt-BR')} movimentações foram adicionadas. O sistema identificou {result.investmentMovementCount.toLocaleString('pt-BR')} registros relacionados a investimentos.
+          </p>
+
+          <div className="summary-grid import-result-grid">
+            <article className="summary-card">
+              <span>Movimentações</span>
+              <strong>{result.transactionCount.toLocaleString('pt-BR')}</strong>
+            </article>
+            <article className="summary-card">
+              <span>Investimentos</span>
+              <strong>{result.investmentMovementCount.toLocaleString('pt-BR')}</strong>
+            </article>
+            <article className="summary-card">
+              <span>Proventos vinculados</span>
+              <strong>{result.incomeCount.toLocaleString('pt-BR')}</strong>
+            </article>
+          </div>
+
+          <div className="import-success-actions">
+            <button
+              type="button"
+              className="primary-button"
+              onClick={() => onNavigate?.('analytics', 'overview')}
+            >
+              Ver visão financeira
+            </button>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => onNavigate?.('analytics', 'investments')}
+            >
+              Ver análise de investimentos
+            </button>
+            <button
+              type="button"
+              className="text-button"
+              onClick={restartImport}
+            >
+              Importar outro arquivo
+            </button>
+          </div>
+        </section>
       )}
     </div>
   )

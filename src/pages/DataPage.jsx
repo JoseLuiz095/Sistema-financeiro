@@ -30,6 +30,7 @@ export default function DataPage({
   accounts,
   categories,
   onChanged,
+  onNavigate,
   setFeedback,
 }) {
   const premiumAccess = hasPremiumDataAccess(user)
@@ -74,6 +75,7 @@ export default function DataPage({
           accounts={accounts}
           categories={categories}
           onChanged={onChanged}
+          onNavigate={onNavigate}
           setFeedback={setFeedback}
         />
       </div>
