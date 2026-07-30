@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import './mobile-ui.css'
 import Feedback from './components/Feedback'
@@ -44,6 +44,69 @@ import {
   calculateInvestmentPositions,
 } from './utils/investmentCalculator'
 
+
+function decodeAuthToken(token) {
+  try {
+    const payload = token?.split('.')?.[1]
+
+    if (!payload) return null
+
+    const normalized = payload
+      .replace(/-/g, '+')
+      .replace(/_/g, '/')
+      .padEnd(
+        payload.length +
+          (4 - (payload.length % 4 || 4)),
+        '=',
+      )
+
+    return JSON.parse(atob(normalized))
+  } catch {
+    return null
+  }
+}
+
+function getAuthSessionId(session) {
+  return decodeAuthToken(
+    session?.access_token,
+  )?.session_id ?? null
+}
+
+function isSameAuthSession(previousSession, nextSession) {
+  if (!previousSession || !nextSession) return false
+
+  const previousId = getAuthSessionId(previousSession)
+  const nextId = getAuthSessionId(nextSession)
+
+  if (previousId && nextId) {
+    return previousId === nextId
+  }
+
+  return (
+    previousSession.user?.id ===
+      nextSession.user?.id &&
+    previousSession.access_token ===
+      nextSession.access_token
+  )
+}
+
+function withTimeout(promise, timeoutMs, message) {
+  let timeoutId
+
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => {
+      reject(new Error(message))
+    }, timeoutMs)
+  })
+
+  return Promise.race([
+    promise,
+    timeoutPromise,
+  ]).finally(() => {
+    window.clearTimeout(timeoutId)
+  })
+}
+
 const NAV_ITEMS = [
   {
     value: 'home',
@@ -75,7 +138,67 @@ const NAV_ITEMS = [
 function LoadingPage({
   message = 'Carregando dados...',
   detail = 'Preparando uma experiência segura e personalizada.',
+  onRetry = null,
+  onExit = null,
+  recoveryDelay = 12000,
 }) {
+  const [showRecovery, setShowRecovery] = useState(false)
+  const [pageVisible, setPageVisible] = useState(
+    () => document.visibilityState !== 'hidden',
+  )
+  const hasRecovery = Boolean(onRetry || onExit)
+
+  useEffect(() => {
+    function handleVisibilityChange() {
+      const isVisible =
+        document.visibilityState !== 'hidden'
+
+      setPageVisible(isVisible)
+
+      if (!isVisible) {
+        setShowRecovery(false)
+      }
+    }
+
+    function handlePageHide() {
+      setPageVisible(false)
+      setShowRecovery(false)
+    }
+
+    document.addEventListener(
+      'visibilitychange',
+      handleVisibilityChange,
+    )
+    window.addEventListener('pagehide', handlePageHide)
+
+    return () => {
+      document.removeEventListener(
+        'visibilitychange',
+        handleVisibilityChange,
+      )
+      window.removeEventListener(
+        'pagehide',
+        handlePageHide,
+      )
+    }
+  }, [])
+
+  useEffect(() => {
+    setShowRecovery(false)
+
+    if (!hasRecovery || !pageVisible) {
+      return undefined
+    }
+
+    const timerId = window.setTimeout(() => {
+      if (document.visibilityState !== 'hidden') {
+        setShowRecovery(true)
+      }
+    }, recoveryDelay)
+
+    return () => window.clearTimeout(timerId)
+  }, [message, hasRecovery, recoveryDelay, pageVisible])
+
   return (
     <main className="loading-page complete-loading-page">
       <div className="loading-ambient loading-ambient-one" />
@@ -108,6 +231,35 @@ function LoadingPage({
         <div className="loading-bars" aria-hidden="true">
           <span /><span /><span /><span /><span />
         </div>
+
+        {showRecovery && (
+          <div className="loading-recovery" role="status">
+            <strong>A verificação está demorando mais que o normal.</strong>
+            <span>
+              Isso pode acontecer ao voltar do Authenticator ou quando a conexão móvel oscila.
+            </span>
+            <div className="loading-recovery-actions">
+              {onRetry && (
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={onRetry}
+                >
+                  Verificar novamente
+                </button>
+              )}
+              {onExit && (
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={onExit}
+                >
+                  Voltar ao login
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </section>
     </main>
   )
@@ -127,6 +279,7 @@ export default function App() {
     mfaRequired,
     setMfaRequired,
   ] = useState(false)
+  const [mfaCheckVersion, setMfaCheckVersion] = useState(0)
   const [
     loadingData,
     setLoadingData,
@@ -150,6 +303,12 @@ export default function App() {
     type: '',
     message: '',
   })
+
+  const sessionRef = useRef(null)
+  const privateDataReadyRef = useRef(false)
+  const mfaRequiredRef = useRef(false)
+  const mfaCheckSequenceRef = useRef(0)
+  const dataLoadSequenceRef = useRef(0)
 
   const [accounts, setAccounts] = useState([])
   const [categories, setCategories] =
@@ -199,6 +358,7 @@ export default function App() {
     authorized: sessionGuardAuthorized,
     sessionId: sessionGuardSessionId,
     authorizedSessionId,
+    retry: retrySessionGuard,
   } = useIdleSessionGuard({
     session: guardSession,
     setFeedback,
@@ -217,23 +377,59 @@ export default function App() {
   )
 
   useEffect(() => {
+    sessionRef.current = session
+  }, [session])
+
+  useEffect(() => {
+    privateDataReadyRef.current = privateDataReady
+  }, [privateDataReady])
+
+  useEffect(() => {
+    mfaRequiredRef.current = mfaRequired
+  }, [mfaRequired])
+
+  useEffect(() => {
     let mounted = true
 
     async function loadSession() {
-      const { data, error } =
-        await supabase.auth.getSession()
+      try {
+        const { data, error } = await withTimeout(
+          supabase.auth.getSession(),
+          8000,
+          'A verificação da sessão demorou além do esperado.',
+        )
 
-      if (!mounted) return
+        if (!mounted) return
 
-      if (error) {
+        if (error) throw error
+
+        const nextSession = data?.session ?? null
+
+        sessionRef.current = nextSession
+        setSession(nextSession)
+        setCheckingSession(false)
+
+        if (nextSession) {
+          setMfaCheckVersion((current) => current + 1)
+        } else {
+          setCheckingMfa(false)
+          setMfaRequired(false)
+        }
+      } catch (error) {
+        if (!mounted) return
+
+        sessionRef.current = null
+        setSession(null)
+        setCheckingSession(false)
+        setCheckingMfa(false)
+        setMfaRequired(false)
         setFeedback({
           type: 'error',
-          message: error.message,
+          message:
+            error?.message ??
+            'Não foi possível verificar a sessão.',
         })
       }
-
-      setSession(data.session)
-      setCheckingSession(false)
     }
 
     loadSession()
@@ -242,10 +438,21 @@ export default function App() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(
       (event, nextSession) => {
+        if (!mounted) return
+
+        const previousSession = sessionRef.current
+        const sameSession = isSameAuthSession(
+          previousSession,
+          nextSession,
+        )
+
+        sessionRef.current = nextSession
         setSession(nextSession)
         setCheckingSession(false)
 
         if (!nextSession || event === 'SIGNED_OUT') {
+          privateDataReadyRef.current = false
+          mfaRequiredRef.current = false
           setCheckingMfa(false)
           setMfaRequired(false)
           setPrivateDataReady(false)
@@ -253,11 +460,36 @@ export default function App() {
         }
 
         if (
+          event === 'INITIAL_SESSION' ||
           event === 'SIGNED_IN' ||
           event === 'USER_UPDATED'
         ) {
-          setPrivateDataReady(false)
-          setCheckingMfa(true)
+          if (!sameSession) {
+            privateDataReadyRef.current = false
+            setPrivateDataReady(false)
+          }
+
+          if (
+            !mfaRequiredRef.current &&
+            !privateDataReadyRef.current
+          ) {
+            setCheckingMfa(true)
+          }
+
+          setMfaCheckVersion((current) => current + 1)
+        }
+
+        if (event === 'TOKEN_REFRESHED') {
+          const pageIsVisible =
+            document.visibilityState !== 'hidden'
+
+          if (
+            pageIsVisible &&
+            !mfaRequiredRef.current &&
+            !privateDataReadyRef.current
+          ) {
+            setMfaCheckVersion((current) => current + 1)
+          }
         }
       },
     )
@@ -270,44 +502,82 @@ export default function App() {
 
   useEffect(() => {
     let active = true
+    const checkSequence =
+      ++mfaCheckSequenceRef.current
 
     async function checkMfa() {
       if (!session) {
+        mfaRequiredRef.current = false
         setMfaRequired(false)
         setCheckingMfa(false)
         return
       }
 
       const shouldBlockInterface =
-        !privateDataReady
+        !privateDataReadyRef.current &&
+        !mfaRequiredRef.current
 
       if (shouldBlockInterface) {
         setCheckingMfa(true)
       }
 
-      const { data, error } =
-        await supabase.auth.mfa
-          .getAuthenticatorAssuranceLevel()
+      try {
+        const { data, error } = await withTimeout(
+          supabase.auth.mfa
+            .getAuthenticatorAssuranceLevel(),
+          8000,
+          'A verificação de segurança demorou além do esperado.',
+        )
 
-      if (!active) return
+        if (
+          !active ||
+          checkSequence !==
+            mfaCheckSequenceRef.current
+        ) {
+          return
+        }
 
-      if (error) {
+        if (error) throw error
+
+        const nextMfaRequired = Boolean(
+          data?.nextLevel === 'aal2' &&
+          data?.currentLevel !== 'aal2',
+        )
+
+        mfaRequiredRef.current = nextMfaRequired
+        setMfaRequired(nextMfaRequired)
+      } catch (error) {
+        if (
+          !active ||
+          checkSequence !==
+            mfaCheckSequenceRef.current
+        ) {
+          return
+        }
+
         setFeedback({
           type: 'error',
           message:
-            'Falha ao verificar a autenticação ' +
-            `em duas etapas: ${error.message}`,
+            'Falha ao verificar a autenticação em duas etapas: ' +
+            error.message,
         })
-        setMfaRequired(true)
-        setCheckingMfa(false)
-        return
-      }
 
-      setMfaRequired(
-        data?.nextLevel === 'aal2' &&
-        data?.currentLevel !== 'aal2',
-      )
-      setCheckingMfa(false)
+        if (
+          !privateDataReadyRef.current &&
+          !mfaRequiredRef.current
+        ) {
+          mfaRequiredRef.current = true
+          setMfaRequired(true)
+        }
+      } finally {
+        if (
+          active &&
+          checkSequence ===
+            mfaCheckSequenceRef.current
+        ) {
+          setCheckingMfa(false)
+        }
+      }
     }
 
     checkMfa()
@@ -315,10 +585,11 @@ export default function App() {
     return () => {
       active = false
     }
-  }, [session?.access_token])
+  }, [session?.access_token, mfaCheckVersion])
 
   useEffect(() => {
     if (!canLoadPrivateData) {
+      privateDataReadyRef.current = false
       setPrivateDataReady(false)
       setAccounts([])
       setCategories([])
@@ -340,10 +611,22 @@ export default function App() {
     loadAllData()
   }, [user?.id, canLoadPrivateData])
 
-  async function loadAllData() {
-    if (!user || !canLoadPrivateData) return
+  async function loadAllData(options = {}) {
+    const force = options?.force === true
+
+    if (
+      !user ||
+      !canLoadPrivateData ||
+      (loadingData && !force)
+    ) {
+      return
+    }
+
+    const loadSequence =
+      ++dataLoadSequenceRef.current
 
     setLoadingData(true)
+    let loadSucceeded = false
 
     try {
       await ensureDefaultCategories(user.id)
@@ -376,7 +659,8 @@ export default function App() {
         openFinanceConnectionRows,
         importedInvestmentPositionRows,
         importedInvestmentTransactionRows,
-      ] = await Promise.all([
+      ] = await withTimeout(
+        Promise.all([
         listAccounts(),
         listCategories(),
         listTransactions(),
@@ -471,7 +755,17 @@ export default function App() {
 
             throw error
           }),
-      ])
+        ]),
+        25000,
+        'O carregamento dos dados demorou além do esperado.',
+      )
+
+      if (
+        loadSequence !==
+        dataLoadSequenceRef.current
+      ) {
+        return
+      }
 
       setAccounts(accountRows)
       setCategories(categoryRows)
@@ -493,16 +787,31 @@ export default function App() {
       setImportedInvestmentTransactions(
         importedInvestmentTransactionRows,
       )
+      loadSucceeded = true
     } catch (error) {
-      setFeedback({
-        type: 'error',
-        message:
-          `Falha ao carregar os dados: ` +
-          error.message,
-      })
+      if (
+        loadSequence ===
+        dataLoadSequenceRef.current
+      ) {
+        setFeedback({
+          type: 'error',
+          message:
+            `Falha ao carregar os dados: ` +
+            error.message,
+        })
+      }
     } finally {
-      setLoadingData(false)
-      setPrivateDataReady(true)
+      if (
+        loadSequence ===
+        dataLoadSequenceRef.current
+      ) {
+        setLoadingData(false)
+
+        if (loadSucceeded) {
+          privateDataReadyRef.current = true
+          setPrivateDataReady(true)
+        }
+      }
     }
   }
 
@@ -542,86 +851,164 @@ export default function App() {
   }
 
   async function logout() {
-    const { error } =
-      await supabase.auth.signOut({
-        scope: 'local',
-      })
+    sessionRef.current = null
+    privateDataReadyRef.current = false
+    mfaRequiredRef.current = false
+    setSession(null)
+    setCheckingSession(false)
+    setCheckingMfa(false)
+    setMfaRequired(false)
+    setPrivateDataReady(false)
 
-    if (error) {
-      setFeedback({
-        type: 'error',
-        message: error.message,
-      })
+    try {
+      const { error } = await withTimeout(
+        supabase.auth.signOut({
+          scope: 'local',
+        }),
+        5000,
+        'A saída demorou além do esperado.',
+      )
+
+      if (error) throw error
+    } catch (error) {
+      sessionStorage.setItem(
+        'financeiro:logout-message',
+        error?.message ??
+          'A sessão foi removida deste dispositivo.',
+      )
     }
   }
 
-  async function handleMfaVerified() {
-    setCheckingMfa(true)
-    setMfaRequired(true)
+  async function handleMfaVerified(verification) {
+    try {
+      let aalData = verification?.aal ?? null
 
-    const {
-      data: aalData,
-      error: aalError,
-    } = await supabase.auth.mfa
-      .getAuthenticatorAssuranceLevel()
+      if (aalData?.currentLevel !== 'aal2') {
+        const {
+          data,
+          error,
+        } = await withTimeout(
+          supabase.auth.mfa
+            .getAuthenticatorAssuranceLevel(),
+          8000,
+          'A confirmação do segundo fator demorou além do esperado.',
+        )
 
-    if (aalError) {
+        if (error) throw error
+        aalData = data
+      }
+
+      if (aalData?.currentLevel !== 'aal2') {
+        throw new Error(
+          'A sessão ainda não foi elevada para AAL2. Aguarde alguns segundos e tente novamente.',
+        )
+      }
+
+      const { data, error } =
+        await supabase.auth.getSession()
+
+      if (error || !data.session) {
+        throw (
+          error ??
+          new Error(
+            'A sessão autenticada não foi encontrada.',
+          )
+        )
+      }
+
+      sessionRef.current = data.session
+      mfaRequiredRef.current = false
+      privateDataReadyRef.current = false
+      setSession(data.session)
+      setMfaRequired(false)
+      setCheckingMfa(false)
+      setPrivateDataReady(false)
+      setMfaCheckVersion((current) => current + 1)
+    } catch (error) {
       setFeedback({
         type: 'error',
         message:
           'Falha ao confirmar o segundo fator: ' +
-          aalError.message,
+          error.message,
       })
+      mfaRequiredRef.current = true
+      setMfaRequired(true)
       setCheckingMfa(false)
-      return
+      throw error
     }
+  }
 
-    if (aalData?.currentLevel !== 'aal2') {
-      setFeedback({
-        type: 'error',
-        message:
-          'A sessão ainda não foi elevada para AAL2. Tente novamente.',
-      })
+  async function retrySecurityCheck() {
+    setFeedback({ type: '', message: '' })
+    setCheckingSession(false)
+    setCheckingMfa(true)
+
+    try {
+      const { data, error } = await withTimeout(
+        supabase.auth.getSession(),
+        8000,
+        'A recuperação da sessão demorou além do esperado.',
+      )
+
+      if (error || !data?.session) {
+        throw (
+          error ??
+          new Error(
+            'A sessão não foi encontrada neste dispositivo.',
+          )
+        )
+      }
+
+      sessionRef.current = data.session
+      setSession(data.session)
+      setMfaCheckVersion((current) => current + 1)
+    } catch (error) {
       setCheckingMfa(false)
-      return
-    }
-
-    const { data, error } =
-      await supabase.auth.getSession()
-
-    if (error || !data.session) {
       setFeedback({
         type: 'error',
         message:
           error?.message ??
-          'A sessão autenticada não foi encontrada.',
+          'Não foi possível recuperar a sessão.',
       })
-      setCheckingMfa(false)
-      return
     }
+  }
 
-    setSession(data.session)
-    setMfaRequired(false)
+  async function exitSecurityFlow() {
+    sessionRef.current = null
+    privateDataReadyRef.current = false
+    mfaRequiredRef.current = false
+    setSession(null)
+    setCheckingSession(false)
     setCheckingMfa(false)
+    setMfaRequired(false)
+    setPrivateDataReady(false)
+
+    try {
+      await withTimeout(
+        supabase.auth.signOut({
+          scope: 'local',
+        }),
+        5000,
+        'A saída demorou além do esperado.',
+      )
+    } catch {
+      // A interface retorna ao login mesmo se a chamada remota falhar.
+    }
   }
 
   if (checkingSession) {
     return (
-      <LoadingPage message="Verificando sessão..." detail="Validando sua sessão antes de liberar o painel financeiro." />
+      <LoadingPage
+        message="Verificando sessão..."
+        detail="Validando sua sessão antes de liberar o painel financeiro."
+        onRetry={retrySecurityCheck}
+        onExit={exitSecurityFlow}
+      />
     )
   }
 
   if (!session) {
     return <AuthPage />
-  }
-
-  if (checkingMfa) {
-    return (
-      <LoadingPage
-        message="Verificando segurança da conta..."
-        detail="Confirmando autenticação e proteção dos seus dados pessoais."
-      />
-    )
   }
 
   if (mfaRequired) {
@@ -632,11 +1019,53 @@ export default function App() {
     )
   }
 
+  if (checkingMfa) {
+    return (
+      <LoadingPage
+        message="Verificando segurança da conta..."
+        detail="Confirmando autenticação e proteção dos seus dados pessoais."
+        onRetry={retrySecurityCheck}
+        onExit={exitSecurityFlow}
+      />
+    )
+  }
+
+  if (guardSession && !sessionGuardReady) {
+    return (
+      <LoadingPage
+        message="Validando sessão segura..."
+        detail="Confirmando a proteção desta sessão antes de carregar seus dados."
+        onRetry={retrySessionGuard}
+        onExit={exitSecurityFlow}
+      />
+    )
+  }
+
+  if (
+    guardSession &&
+    sessionGuardReady &&
+    !sessionGuardAuthorized
+  ) {
+    return (
+      <LoadingPage
+        message="Sessão segura pendente"
+        detail="Não foi possível concluir a validação automática. Verifique a conexão e tente novamente."
+        onRetry={retrySessionGuard}
+        onExit={exitSecurityFlow}
+        recoveryDelay={12000}
+      />
+    )
+  }
+
   if (canLoadPrivateData && !privateDataReady) {
     return (
       <LoadingPage
         message="Montando seu painel..."
         detail="Consolidando contas, transações, investimentos e indicadores."
+        onRetry={() =>
+          loadAllData({ force: true })
+        }
+        onExit={exitSecurityFlow}
       />
     )
   }

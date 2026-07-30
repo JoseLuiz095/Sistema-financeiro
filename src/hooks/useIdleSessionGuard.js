@@ -60,6 +60,7 @@ export default function useIdleSessionGuard({
     authorizedSessionId,
     setAuthorizedSessionId,
   ] = useState(null)
+  const [retryKey, setRetryKey] = useState(0)
 
   const expiringRef = useRef(false)
   const initializedRef = useRef(false)
@@ -68,6 +69,7 @@ export default function useIdleSessionGuard({
   const activityDirtyRef = useRef(false)
   const guardTokenRef = useRef(null)
   const channelRef = useRef(null)
+  const resumeTimerRef = useRef(null)
 
   const hasSession = Boolean(session)
 
@@ -256,15 +258,18 @@ export default function useIdleSessionGuard({
         if (!initializedRef.current) {
           setReady(true)
           setAuthorized(false)
+          setAuthorizedSessionId(null)
           setFeedback?.({
             type: 'error',
             message:
-              'Não foi possível validar a sessão segura: ' +
-              error.message,
+              'Não foi possível validar a sessão segura. Verifique a conexão e tente novamente.',
           })
-          await expireSession(
-            'validation_failed',
-          )
+        } else {
+          setFeedback?.({
+            type: 'info',
+            message:
+              'A verificação de segurança será repetida quando a conexão estabilizar.',
+          })
         }
       } finally {
         checking = false
@@ -364,13 +369,31 @@ export default function useIdleSessionGuard({
 
     function onVisibilityChange() {
       if (
-        document.visibilityState ===
+        document.visibilityState !==
         'visible'
       ) {
-        evaluateSession({
-          forceServerCheck: true,
-        })
+        return
       }
+
+      const idleFor =
+        Date.now() - getLastActivity()
+
+      if (idleFor < timeoutMs) {
+        recordActivity()
+      }
+
+      if (resumeTimerRef.current) {
+        window.clearTimeout(
+          resumeTimerRef.current,
+        )
+      }
+
+      resumeTimerRef.current =
+        window.setTimeout(() => {
+          evaluateSession({
+            forceServerCheck: true,
+          })
+        }, 250)
     }
 
     channel?.addEventListener(
@@ -422,6 +445,10 @@ export default function useIdleSessionGuard({
       onVisibilityChange,
     )
     window.addEventListener(
+      'pageshow',
+      onVisibilityChange,
+    )
+    window.addEventListener(
       'storage',
       onStorage,
     )
@@ -470,6 +497,18 @@ export default function useIdleSessionGuard({
         onVisibilityChange,
       )
       window.removeEventListener(
+        'pageshow',
+        onVisibilityChange,
+      )
+
+      if (resumeTimerRef.current) {
+        window.clearTimeout(
+          resumeTimerRef.current,
+        )
+        resumeTimerRef.current = null
+      }
+
+      window.removeEventListener(
         'storage',
         onStorage,
       )
@@ -488,12 +527,21 @@ export default function useIdleSessionGuard({
     storageKeys,
     timeoutMs,
     setFeedback,
+    retryKey,
   ])
+
+  function retry() {
+    setReady(false)
+    setAuthorized(false)
+    setAuthorizedSessionId(null)
+    setRetryKey((current) => current + 1)
+  }
 
   return {
     ready,
     authorized,
     sessionId,
     authorizedSessionId,
+    retry,
   }
 }

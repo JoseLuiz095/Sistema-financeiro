@@ -19,61 +19,143 @@ function getApplicationUrl() {
   ).replace(/\/+$/, '')
 }
 
-function getAuthErrorMessage(error) {
-  const code = String(error?.code ?? '').trim()
+
+function readAuthErrorText(error) {
+  if (typeof error === 'string') {
+    return error.trim()
+  }
+
+  if (!error || typeof error !== 'object') {
+    return ''
+  }
+
+  const candidates = [
+    error.message,
+    error.error_description,
+    error.msg,
+    error.details,
+    error.hint,
+    typeof error.error === 'string'
+      ? error.error
+      : error.error?.message,
+    error.cause?.message,
+  ]
+
+  return String(
+    candidates.find(
+      (value) =>
+        typeof value === 'string' &&
+        value.trim() &&
+        value.trim() !== '{}' &&
+        value.trim() !== '[object Object]',
+    ) ?? '',
+  ).trim()
+}
+
+function getAuthErrorMessage(
+  error,
+  fallback = 'Não foi possível concluir a operação de autenticação.',
+) {
+  const code = String(
+    error?.code ??
+      error?.error_code ??
+      error?.name ??
+      '',
+  ).trim()
+  const status = Number(
+    error?.status ??
+      error?.statusCode ??
+      0,
+  )
 
   const messages = {
     email_exists:
-      'Este e-mail ainda está cadastrado no Supabase Auth.',
-
+      'Este e-mail ainda está cadastrado no Supabase Auth. Exclua o usuário permanentemente em Authentication > Users ou entre com a conta existente.',
     user_already_exists:
-      'Este usuário ainda existe no Supabase Auth.',
-
+      'Este usuário ainda existe no Supabase Auth. Confirme se a exclusão anterior foi permanente.',
+    identity_already_exists:
+      'Já existe uma identidade de login vinculada a este e-mail.',
     email_address_not_authorized:
-      'O SMTP do Supabase não está autorizado a enviar e-mails para esse endereço. Configure um SMTP próprio.',
-
-    over_email_send_rate_limit:
-      'Muitos e-mails foram enviados recentemente. Aguarde alguns minutos antes de tentar novamente.',
-
-    over_request_rate_limit:
-      'Muitas tentativas foram realizadas. Aguarde alguns minutos.',
-
-    signup_disabled:
-      'A criação de novos usuários está desabilitada no Supabase.',
-
-    email_provider_disabled:
-      'O cadastro por e-mail e senha está desabilitado no Supabase.',
-
-    weak_password:
-      'A senha não atende aos requisitos de segurança configurados.',
-
-    unexpected_failure:
-      'O Supabase encontrou um erro interno ao criar o usuário. Verifique os logs de autenticação e do banco.',
-
+      'O serviço de e-mail não está autorizado a enviar para este endereço. Configure o SMTP próprio no Supabase.',
+    email_not_confirmed:
+      'Este e-mail ainda não foi confirmado. Informe o código enviado para concluir o cadastro.',
+    invalid_credentials:
+      'E-mail ou senha inválidos.',
     otp_expired:
       'O código expirou ou já foi utilizado. Solicite um novo código.',
-
+    otp_disabled:
+      'A confirmação por código está desabilitada no Supabase.',
+    over_email_send_rate_limit:
+      'Muitos e-mails foram enviados recentemente. Aguarde alguns minutos antes de tentar novamente.',
+    over_request_rate_limit:
+      'Muitas tentativas foram realizadas. Aguarde alguns minutos.',
+    request_timeout:
+      'A autenticação demorou além do esperado. Verifique sua conexão e tente novamente.',
+    signup_disabled:
+      'A criação de novos usuários está desabilitada no Supabase.',
+    email_provider_disabled:
+      'O cadastro por e-mail e senha está desabilitado no Supabase.',
+    weak_password:
+      'A senha não atende aos requisitos de segurança configurados.',
     validation_failed:
       'Os dados enviados para autenticação são inválidos.',
+    user_not_found:
+      'O usuário não foi encontrado. Faça um novo cadastro.',
+    session_not_found:
+      'A sessão não foi encontrada. Entre novamente.',
+    session_expired:
+      'A sessão expirou. Entre novamente.',
+    unexpected_failure:
+      'O Supabase retornou um erro interno no cadastro. Verifique primeiro o Sender email address e o SMTP; se estiverem corretos, consulte os Auth Logs.',
   }
 
   if (messages[code]) {
     return messages[code]
   }
 
-  const message = String(error?.message ?? '').trim()
+  const message = readAuthErrorText(error)
 
-  if (
-    message &&
-    message !== '{}' &&
-    message !== '[object Object]'
-  ) {
+  if (message) {
+    if (/already|exists|registered/i.test(message)) {
+      return messages.email_exists
+    }
+
+    if (/network|fetch|offline/i.test(message)) {
+      return 'Não foi possível acessar o serviço de autenticação. Verifique a conexão com a internet.'
+    }
+
     return message
   }
 
-  return 'Não foi possível concluir a operação. Consulte os logs de autenticação do Supabase.'
+  if (status >= 500) {
+    return 'O serviço de autenticação retornou um erro interno. Verifique o Sender email address e o SMTP; se estiverem corretos, consulte os Auth Logs do Supabase.'
+  }
+
+  return code
+    ? `${fallback} Código: ${code}.`
+    : fallback
 }
 
+function logAuthError(context, error) {
+  console.error(`[AUTH][${context}]`, {
+    name: error?.name,
+    code: error?.code ?? error?.error_code,
+    message: readAuthErrorText(error),
+    status: error?.status ?? error?.statusCode,
+    cause: error?.cause,
+    raw: error,
+  })
+}
+
+function isMaskedExistingUser(data) {
+  const identities = data?.user?.identities
+
+  return Boolean(
+    data?.user &&
+    Array.isArray(identities) &&
+    identities.length === 0,
+  )
+}
 
 export default function AuthPage() {
   const signupEnabled =
@@ -130,7 +212,7 @@ export default function AuthPage() {
 
   const submitLabel = useMemo(() => {
     if (loading) {
-      return isSignup ? 'Criando conta...' : 'Verificando...'
+      return isSignup ? 'Criando conta...' : 'Entrando...'
     }
 
     return isSignup ? 'Criar minha conta' : 'Entrar'
@@ -143,7 +225,6 @@ export default function AuthPage() {
     setConfirmPassword('')
     setVerificationCode('')
   }
-
 
   function openVerification(emailAddress) {
     const normalizedEmail = emailAddress.trim().toLowerCase()
@@ -171,9 +252,9 @@ export default function AuthPage() {
     setLoading(true)
     setFeedback({ type: '', message: '' })
 
-    try {
-      const normalizedEmail = email.trim().toLowerCase()
+    const normalizedEmail = email.trim().toLowerCase()
 
+    try {
       if (isSignup) {
         if (name.trim().length < 2) {
           throw new Error('Informe seu nome.')
@@ -203,6 +284,23 @@ export default function AuthPage() {
 
         if (error) throw error
 
+        if (isMaskedExistingUser(data)) {
+          const duplicateError = new Error(
+            'Este e-mail já possui um cadastro ou ainda não foi removido permanentemente do Supabase Auth.',
+          )
+          duplicateError.code = 'email_exists'
+          duplicateError.status = 422
+          throw duplicateError
+        }
+
+        if (!data?.user && !data?.session) {
+          const emptyResponseError = new Error(
+            'O Supabase não retornou os dados do novo usuário. Consulte os Auth Logs antes de repetir o cadastro.',
+          )
+          emptyResponseError.code = 'empty_signup_response'
+          throw emptyResponseError
+        }
+
         if (data?.session) {
           sessionStorage.removeItem(PENDING_SIGNUP_EMAIL_KEY)
           setFeedback({
@@ -231,9 +329,28 @@ export default function AuthPage() {
 
       if (error) throw error
     } catch (error) {
+      logAuthError(isSignup ? 'SIGNUP' : 'LOGIN', error)
+
+      const code = String(error?.code ?? '').trim()
+
+      if (!isSignup && code === 'email_not_confirmed') {
+        openVerification(normalizedEmail)
+        setFeedback({
+          type: 'info',
+          message:
+            'Este e-mail ainda precisa ser confirmado. Digite o código recebido para continuar.',
+        })
+        return
+      }
+
       setFeedback({
         type: 'error',
-        message: error.message,
+        message: getAuthErrorMessage(
+          error,
+          isSignup
+            ? 'Não foi possível criar a conta.'
+            : 'Não foi possível entrar.',
+        ),
       })
     } finally {
       setLoading(false)
@@ -288,9 +405,13 @@ export default function AuthPage() {
           'E-mail confirmado. Entre com a senha cadastrada.',
       })
     } catch (error) {
+      logAuthError('VERIFY_SIGNUP', error)
       setFeedback({
         type: 'error',
-        message: error.message,
+        message: getAuthErrorMessage(
+          error,
+          'Não foi possível confirmar o código.',
+        ),
       })
     } finally {
       setLoading(false)
@@ -329,9 +450,13 @@ export default function AuthPage() {
           'Um novo código foi enviado. Use sempre o código mais recente.',
       })
     } catch (error) {
+      logAuthError('RESEND_SIGNUP', error)
       setFeedback({
         type: 'error',
-        message: error.message,
+        message: getAuthErrorMessage(
+          error,
+          'Não foi possível reenviar o código.',
+        ),
       })
     } finally {
       setResending(false)

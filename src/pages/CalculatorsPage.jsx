@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { AnimatePresence, m, MotionReveal } from '../components/AppMotion'
 import AppIcon from '../components/AppIcon'
 import SimulationChart from '../components/calculators/SimulationChart'
@@ -629,6 +629,30 @@ export default function CalculatorsPage() {
   const [selectedId, setSelectedId] = useState('compound')
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('Todas')
+  const libraryRef = useRef(null)
+  const workspaceRef = useRef(null)
+
+  function scrollToElement(ref) {
+    window.requestAnimationFrame(() => {
+      window.setTimeout(() => {
+        ref.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        })
+      }, 50)
+    })
+  }
+
+  function selectCalculator(id) {
+    setSelectedId(id)
+
+    if (
+      typeof window !== 'undefined' &&
+      window.matchMedia('(max-width: 900px)').matches
+    ) {
+      scrollToElement(workspaceRef)
+    }
+  }
 
   const filtered = useMemo(() => {
     const term = search.trim().toLocaleLowerCase('pt-BR')
@@ -670,7 +694,7 @@ export default function CalculatorsPage() {
       </MotionReveal>
 
       <MotionReveal delay={0.04}>
-        <section className="panel calculator-library-panel">
+        <section ref={libraryRef} className="panel calculator-library-panel">
           <div className="calculator-toolbar">
             <label className="calculator-search">
               <AppIcon name="search" size={18} />
@@ -702,7 +726,7 @@ export default function CalculatorsPage() {
                 key={item.id}
                 type="button"
                 className={`calculator-card ${selectedId === item.id ? 'active' : ''}`}
-                onClick={() => setSelectedId(item.id)}
+                onClick={() => selectCalculator(item.id)}
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: Math.min(index * 0.025, 0.18) }}
@@ -733,17 +757,36 @@ export default function CalculatorsPage() {
         </section>
       </MotionReveal>
 
-      <AnimatePresence mode="wait">
-        <m.div
-          key={selected.id}
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -8 }}
-          transition={{ duration: 0.22 }}
-        >
-          <SelectedCalculator />
-        </m.div>
-      </AnimatePresence>
+      <div
+        ref={workspaceRef}
+        className="calculator-workspace-anchor"
+      >
+        <div className="calculator-mobile-context">
+          <div>
+            <span>Simulador selecionado</span>
+            <strong>{selected.title}</strong>
+          </div>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => scrollToElement(libraryRef)}
+          >
+            Trocar
+          </button>
+        </div>
+
+        <AnimatePresence mode="wait">
+          <m.div
+            key={selected.id}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.22 }}
+          >
+            <SelectedCalculator />
+          </m.div>
+        </AnimatePresence>
+      </div>
 
       <section className="calculator-disclaimer">
         <AppIcon name="shield" size={19} />

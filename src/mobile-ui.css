@@ -1750,3 +1750,40 @@ textarea,
     width: 100%;
   }
 }
+
+/* =========================================================
+   ETAPA V8 - NAVEGACAO E LAYOUT MOBILE FINAL
+   ========================================================= */
+@media (max-width: 760px) {
+  .main-nav,
+  .simplified-main-nav,
+  .main-nav.simplified-main-nav {
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  }
+
+  .main-nav button {
+    min-width: 0;
+    padding-inline: 1px;
+    font-size: 9.5px;
+  }
+
+  .nav-icon-wrap {
+    width: 29px;
+    height: 27px;
+  }
+
+  .app-page {
+    padding-bottom: calc(88px + env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 380px) {
+  .main-nav button {
+    font-size: 8.5px;
+  }
+
+  .nav-icon-wrap {
+    width: 27px;
+    height: 25px;
+  }
+}

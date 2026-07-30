@@ -211,3 +211,55 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Etapa V8: estabilidade ao alternar para o Authenticator */
+.mfa-app-switch-note {
+  display: grid;
+  gap: 4px;
+  margin: 18px 0;
+  padding: 13px 14px;
+  border: 1px solid #d8e5f1;
+  border-radius: 13px;
+  color: #526176;
+  background: #f5f9fd;
+}
+
+.mfa-app-switch-note strong {
+  color: #26384f;
+  font-size: 13px;
+}
+
+.mfa-app-switch-note span {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.mfa-load-recovery {
+  display: grid;
+  gap: 10px;
+}
+
+.mfa-load-recovery .primary-button,
+.mfa-load-recovery .secondary-button {
+  width: 100%;
+}
+
+@media (max-width: 560px) {
+  .security-auth-page {
+    min-height: 100dvh;
+  }
+
+  .mfa-challenge-card .form {
+    gap: 14px;
+  }
+
+  .mfa-code-input {
+    min-height: 60px;
+    font-size: 25px;
+    letter-spacing: 0.28em;
+  }
+
+  .mfa-app-switch-note {
+    margin: 14px 0;
+  }
+}

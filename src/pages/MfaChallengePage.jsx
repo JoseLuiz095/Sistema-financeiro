@@ -1,4 +1,9 @@
-import { useEffect, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react'
 import Feedback from '../components/Feedback'
 import { supabase } from '../lib/supabase'
 import {
@@ -6,6 +11,51 @@ import {
   verifyTotpFactor,
 } from '../services/securityService'
 import './security.css'
+
+function withTimeout(promise, timeoutMs, message) {
+  let timeoutId
+
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => {
+      reject(new Error(message))
+    }, timeoutMs)
+  })
+
+  return Promise.race([
+    promise,
+    timeoutPromise,
+  ]).finally(() => {
+    window.clearTimeout(timeoutId)
+  })
+}
+
+function getMfaErrorMessage(error) {
+  const code = String(error?.code ?? '').trim()
+
+  const messages = {
+    mfa_verification_failed:
+      'Código inválido ou expirado. Aguarde o próximo código do Authenticator e tente novamente.',
+    insufficient_aal:
+      'A sessão ainda não atingiu o nível de segurança necessário.',
+    session_not_found:
+      'A sessão não foi encontrada. Entre novamente.',
+    session_expired:
+      'A sessão expirou. Entre novamente.',
+    request_timeout:
+      'A verificação demorou além do esperado. Verifique a conexão e tente novamente.',
+  }
+
+  if (messages[code]) return messages[code]
+
+  const message = String(error?.message ?? '').trim()
+
+  if (/invalid|expired|verification/i.test(message)) {
+    return messages.mfa_verification_failed
+  }
+
+  return message ||
+    'Não foi possível concluir a verificação em duas etapas.'
+}
 
 export default function MfaChallengePage({
   onVerified,
@@ -15,49 +65,112 @@ export default function MfaChallengePage({
   const [code, setCode] = useState('')
   const [loading, setLoading] = useState(true)
   const [verifying, setVerifying] = useState(false)
+  const [loadFailed, setLoadFailed] = useState(false)
   const [feedback, setFeedback] = useState({
     type: '',
     message: '',
   })
+  const codeInputRef = useRef(null)
+  const mountedRef = useRef(true)
 
-  useEffect(() => {
-    let active = true
+  const loadFactors = useCallback(async () => {
+    setLoading(true)
+    setLoadFailed(false)
+    setFeedback({ type: '', message: '' })
 
-    async function loadFactors() {
-      try {
-        const state = await getMfaSecurityState()
-        if (!active) return
+    try {
+      const state = await withTimeout(
+        getMfaSecurityState(),
+        8000,
+        'O carregamento dos autenticadores demorou além do esperado.',
+      )
 
-        const verifiedTotp = state.verifiedFactors
-          .filter((factor) => factor.factor_type === 'totp')
+      if (!mountedRef.current) return
 
-        setFactors(verifiedTotp)
-        setFactorId(verifiedTotp[0]?.id ?? '')
+      const verifiedTotp = state.verifiedFactors
+        .filter(
+          (factor) =>
+            factor.factor_type === 'totp',
+        )
 
-        if (verifiedTotp.length === 0) {
-          setFeedback({
-            type: 'error',
-            message:
-              'Nenhum autenticador verificado foi encontrado nesta conta.',
-          })
-        }
-      } catch (error) {
-        if (!active) return
+      setFactors(verifiedTotp)
+      setFactorId(
+        (current) =>
+          verifiedTotp.some(
+            (factor) => factor.id === current,
+          )
+            ? current
+            : verifiedTotp[0]?.id ?? '',
+      )
+
+      if (verifiedTotp.length === 0) {
+        setLoadFailed(true)
         setFeedback({
           type: 'error',
-          message: error.message,
+          message:
+            'Nenhum autenticador verificado foi encontrado nesta conta.',
         })
-      } finally {
-        if (active) setLoading(false)
+      }
+    } catch (error) {
+      if (!mountedRef.current) return
+
+      setLoadFailed(true)
+      setFeedback({
+        type: 'error',
+        message: getMfaErrorMessage(error),
+      })
+    } finally {
+      if (mountedRef.current) {
+        setLoading(false)
       }
     }
+  }, [])
 
+  useEffect(() => {
+    mountedRef.current = true
     loadFactors()
 
     return () => {
-      active = false
+      mountedRef.current = false
     }
-  }, [])
+  }, [loadFactors])
+
+  useEffect(() => {
+    function focusCodeWhenVisible() {
+      if (
+        document.visibilityState === 'visible' &&
+        !loading &&
+        !verifying &&
+        factorId
+      ) {
+        window.setTimeout(() => {
+          codeInputRef.current?.focus({
+            preventScroll: true,
+          })
+        }, 180)
+      }
+    }
+
+    document.addEventListener(
+      'visibilitychange',
+      focusCodeWhenVisible,
+    )
+    window.addEventListener(
+      'pageshow',
+      focusCodeWhenVisible,
+    )
+
+    return () => {
+      document.removeEventListener(
+        'visibilitychange',
+        focusCodeWhenVisible,
+      )
+      window.removeEventListener(
+        'pageshow',
+        focusCodeWhenVisible,
+      )
+    }
+  }, [factorId, loading, verifying])
 
   async function submit(event) {
     event.preventDefault()
@@ -73,10 +186,15 @@ export default function MfaChallengePage({
 
       await onVerified(verification)
     } catch (error) {
+      setCode('')
       setFeedback({
         type: 'error',
-        message: error.message,
+        message: getMfaErrorMessage(error),
       })
+
+      window.setTimeout(() => {
+        codeInputRef.current?.focus()
+      }, 80)
     } finally {
       setVerifying(false)
     }
@@ -110,9 +228,34 @@ export default function MfaChallengePage({
           </div>
         </div>
 
+        <div className="mfa-app-switch-note">
+          <strong>Você pode trocar de aplicativo.</strong>
+          <span>
+            Ao voltar do Authenticator, esta tela e o código digitado continuarão disponíveis.
+          </span>
+        </div>
+
         {loading ? (
-          <div className="security-loading">
+          <div className="security-loading" aria-live="polite">
             Carregando autenticadores...
+          </div>
+        ) : loadFailed ? (
+          <div className="mfa-load-recovery">
+            <Feedback feedback={feedback} />
+            <button
+              type="button"
+              className="primary-button"
+              onClick={loadFactors}
+            >
+              Carregar novamente
+            </button>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={logout}
+            >
+              Voltar ao login
+            </button>
           </div>
         ) : (
           <form className="form" onSubmit={submit}>
@@ -141,6 +284,7 @@ export default function MfaChallengePage({
             <label>
               Código de segurança
               <input
+                ref={codeInputRef}
                 type="text"
                 inputMode="numeric"
                 autoComplete="one-time-code"
