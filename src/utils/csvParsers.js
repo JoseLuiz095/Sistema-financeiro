@@ -227,3 +227,229 @@ export async function parseFinancialCsv(file) {
     parserErrors: parsed.errors ?? [],
   }
 }
+
+function getOfxTag(block, tagName) {
+  const expression = new RegExp(
+    `<${tagName}>([^<\\r\\n]*)`,
+    'i',
+  )
+  return String(block ?? '').match(expression)?.[1]?.trim() ?? ''
+}
+
+function parseOfxDate(value) {
+  const digits = String(value ?? '').replace(/\D/g, '')
+  if (digits.length < 8) return null
+
+  const year = digits.slice(0, 4)
+  const month = digits.slice(4, 6)
+  const day = digits.slice(6, 8)
+  const date = `${year}-${month}-${day}`
+
+  const parsed = new Date(`${date}T00:00:00`)
+  if (Number.isNaN(parsed.getTime())) return null
+
+  return date
+}
+
+function parseOfxTime(value) {
+  const digits = String(value ?? '').replace(/\D/g, '')
+  if (digits.length < 14) return null
+
+  return `${digits.slice(8, 10)}:${digits.slice(10, 12)}:${digits.slice(12, 14)}`
+}
+
+function decodeOfxText(value) {
+  return String(value ?? '')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function inferOfxClassification(transactionType, amount, description) {
+  const normalizedType = normalizeText(transactionType)
+  const normalizedDescription = normalizeText(description)
+
+  if (
+    normalizedType.includes('xfer') ||
+    normalizedDescription.includes('transferencia entre contas')
+  ) {
+    return {
+      type: amount < 0
+        ? 'OWN_TRANSFER_OUT'
+        : 'OWN_TRANSFER_IN',
+      category: null,
+      needsReview: true,
+    }
+  }
+
+  if (
+    normalizedDescription.includes('estorno') ||
+    normalizedDescription.includes('reembolso')
+  ) {
+    return {
+      type: amount >= 0 ? 'REFUND' : 'EXPENSE',
+      category: amount >= 0 ? 'Reembolso' : 'Outras despesas',
+      needsReview: true,
+    }
+  }
+
+  return {
+    type: amount < 0 ? 'EXPENSE' : 'INCOME',
+    category: amount < 0 ? 'Outras despesas' : 'Renda extra',
+    needsReview: true,
+  }
+}
+
+function getOfxTransactionBlocks(text) {
+  const blocks = []
+  const expression = /<STMTTRN>([\s\S]*?)(?:<\/STMTTRN>|(?=<STMTTRN>|<\/BANKTRANLIST>|<\/CCSTMTRS>|<\/STMTRS>))/gi
+  let match
+
+  while ((match = expression.exec(text)) !== null) {
+    blocks.push(match[1])
+  }
+
+  return blocks
+}
+
+export async function parseFinancialOfx(file) {
+  const text = (await file.text()).replace(/^\uFEFF/, '')
+  const upperText = text.toUpperCase()
+
+  if (!upperText.includes('<OFX') && !upperText.includes('<STMTTRN>')) {
+    throw new Error('O arquivo não possui uma estrutura OFX reconhecida.')
+  }
+
+  const blocks = getOfxTransactionBlocks(text)
+  if (blocks.length === 0) {
+    throw new Error('Nenhuma movimentação foi encontrada no arquivo OFX.')
+  }
+
+  const fileHash = await sha256File(file)
+  const institution = decodeOfxText(
+    getOfxTag(text, 'ORG') ||
+      getOfxTag(text, 'BANKID') ||
+      'Instituição financeira',
+  )
+  const accountReference = decodeOfxText(
+    getOfxTag(text, 'ACCTID'),
+  )
+  const rows = []
+
+  for (let index = 0; index < blocks.length; index += 1) {
+    const block = blocks[index]
+    const postedAt = getOfxTag(block, 'DTPOSTED')
+    const date = parseOfxDate(postedAt)
+    const time = parseOfxTime(postedAt)
+    const amount = Number(
+      getOfxTag(block, 'TRNAMT').replace(',', '.'),
+    )
+    const transactionType = getOfxTag(block, 'TRNTYPE')
+    const fitId = getOfxTag(block, 'FITID')
+    const name = decodeOfxText(getOfxTag(block, 'NAME'))
+    const memo = decodeOfxText(getOfxTag(block, 'MEMO'))
+    const checkNumber = decodeOfxText(
+      getOfxTag(block, 'CHECKNUM'),
+    )
+    const description = [name, memo, checkNumber]
+      .filter(Boolean)
+      .filter((value, valueIndex, values) =>
+        values.indexOf(value) === valueIndex,
+      )
+      .join(' - ')
+
+    if (
+      !date ||
+      !description ||
+      !Number.isFinite(amount) ||
+      amount === 0
+    ) {
+      continue
+    }
+
+    const classification = inferOfxClassification(
+      transactionType,
+      amount,
+      description,
+    )
+    const signedAmount = signAmount(
+      classification.type,
+      amount,
+    )
+    const recordHash = await sha256Text(
+      `${fileHash}|${fitId || index}|${date}|${description}|${signedAmount}`,
+    )
+
+    rows.push({
+      rowIndex: index + 1,
+      date,
+      time,
+      description,
+      counterparty: name || memo || null,
+      transactionType: classification.type,
+      categoryName: classification.category,
+      amount: signedAmount,
+      needsReview: Boolean(classification.needsReview),
+      confidence: 75,
+      ticker: null,
+      incomeType: null,
+      quantityReference: null,
+      recordHash,
+      sourceData: {
+        format: 'OFX',
+        transactionType,
+        fitId: fitId || null,
+        name: name || null,
+        memo: memo || null,
+        checkNumber: checkNumber || null,
+        accountReference: accountReference
+          ? accountReference.slice(-6)
+          : null,
+      },
+      ignored: false,
+    })
+  }
+
+  if (rows.length === 0) {
+    throw new Error(
+      'O arquivo foi aberto, mas não contém movimentações válidas para importação.',
+    )
+  }
+
+  return {
+    fileName: file.name,
+    fileHash,
+    fileType: 'OFX',
+    layout: `OFX - ${institution}`,
+    institution,
+    accountReference: accountReference
+      ? accountReference.slice(-6)
+      : null,
+    delimiter: null,
+    rows,
+    parserErrors: [],
+  }
+}
+
+export async function parseFinancialFile(file) {
+  const extension = String(file?.name ?? '')
+    .split('.')
+    .at(-1)
+    ?.toLowerCase()
+
+  if (extension === 'ofx' || extension === 'qfx') {
+    return parseFinancialOfx(file)
+  }
+
+  if (extension === 'csv') {
+    return parseFinancialCsv(file)
+  }
+
+  throw new Error(
+    'Formato não suportado. Exporte o extrato em OFX, QFX ou CSV.',
+  )
+}

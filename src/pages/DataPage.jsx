@@ -1,26 +1,28 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import AppIcon from '../components/AppIcon'
+import { hasPremiumDataAccess } from '../utils/openFinanceAccess'
 import ImportPage from './ImportPage'
 import OpenFinancePage from './OpenFinancePage'
 
-const OPTIONS = [
-  {
-    value: 'import',
-    title: 'Importar extrato',
-    description: 'Envie um arquivo CSV e revise as movimentações antes de gravar.',
-    action: 'Abrir importação',
-    icon: 'upload',
-    badge: 'CSV',
-  },
-  {
-    value: 'openfinance',
-    title: 'Open Finance',
-    description: 'Conecte instituições e atualize contas, cartões, faturas e investimentos.',
-    action: 'Abrir conexão',
-    icon: 'bank',
-    badge: 'Conexão segura',
-  },
-]
+const IMPORT_OPTION = {
+  value: 'import',
+  title: 'Importar extrato',
+  description:
+    'Envie um arquivo OFX, QFX ou CSV. O arquivo é lido no seu navegador e você revisa tudo antes de salvar.',
+  action: 'Importar meu extrato',
+  icon: 'upload',
+  badge: 'OFX e CSV',
+}
+
+const OPEN_FINANCE_OPTION = {
+  value: 'openfinance',
+  title: 'Open Finance',
+  description:
+    'Conecte instituições e atualize contas, cartões, faturas e investimentos automaticamente.',
+  action: 'Abrir conexão',
+  icon: 'bank',
+  badge: 'Acesso antecipado',
+}
 
 export default function DataPage({
   requestedSection,
@@ -30,16 +32,40 @@ export default function DataPage({
   onChanged,
   setFeedback,
 }) {
-  const [section, setSection] = useState(requestedSection || 'menu')
+  const premiumAccess = hasPremiumDataAccess(user)
+  const initialSection =
+    requestedSection === 'openfinance' && !premiumAccess
+      ? 'import'
+      : requestedSection || 'menu'
+  const [section, setSection] = useState(initialSection)
+
+  const options = useMemo(
+    () =>
+      premiumAccess
+        ? [IMPORT_OPTION, OPEN_FINANCE_OPTION]
+        : [IMPORT_OPTION],
+    [premiumAccess],
+  )
 
   useEffect(() => {
-    if (requestedSection) setSection(requestedSection)
-  }, [requestedSection])
+    if (!requestedSection) return
+
+    if (requestedSection === 'openfinance' && !premiumAccess) {
+      setSection('import')
+      return
+    }
+
+    setSection(requestedSection)
+  }, [premiumAccess, requestedSection])
 
   if (section === 'import') {
     return (
       <div className="page-stack">
-        <button type="button" className="back-button action-button-with-icon" onClick={() => setSection('menu')}>
+        <button
+          type="button"
+          className="back-button action-button-with-icon"
+          onClick={() => setSection('menu')}
+        >
           <span aria-hidden="true">←</span>
           Voltar para dados
         </button>
@@ -54,14 +80,22 @@ export default function DataPage({
     )
   }
 
-  if (section === 'openfinance') {
+  if (section === 'openfinance' && premiumAccess) {
     return (
       <div className="page-stack">
-        <button type="button" className="back-button action-button-with-icon" onClick={() => setSection('menu')}>
+        <button
+          type="button"
+          className="back-button action-button-with-icon"
+          onClick={() => setSection('menu')}
+        >
           <span aria-hidden="true">←</span>
           Voltar para dados
         </button>
-        <OpenFinancePage user={user} setFeedback={setFeedback} onChanged={onChanged} />
+        <OpenFinancePage
+          user={user}
+          setFeedback={setFeedback}
+          onChanged={onChanged}
+        />
       </div>
     )
   }
@@ -76,14 +110,19 @@ export default function DataPage({
           <span className="eyebrow">Entrada de dados</span>
           <h2>Como deseja atualizar o sistema?</h2>
           <p>
-            Importe um extrato ou conecte uma instituição. A análise de crédito e dívidas
-            agora está agrupada na Central de análises.
+            {premiumAccess
+              ? 'Importe um extrato ou use a conexão automática em acesso antecipado.'
+              : 'Importe o extrato disponibilizado pelo seu banco. O processo é simples, revisável e não envia o arquivo original para o servidor.'}
           </p>
         </div>
       </section>
 
-      <section className="workspace-choice-grid">
-        {OPTIONS.map((option) => (
+      <section
+        className={`workspace-choice-grid ${
+          premiumAccess ? '' : 'workspace-choice-grid-single'
+        }`}
+      >
+        {options.map((option) => (
           <button
             key={option.value}
             type="button"
@@ -91,7 +130,10 @@ export default function DataPage({
             onClick={() => setSection(option.value)}
           >
             <div className="workspace-choice-top">
-              <div className="workspace-choice-icon" aria-hidden="true">
+              <div
+                className="workspace-choice-icon"
+                aria-hidden="true"
+              >
                 <AppIcon name={option.icon} size={25} />
               </div>
               <span className="choice-badge">{option.badge}</span>
@@ -109,8 +151,11 @@ export default function DataPage({
       <section className="privacy-strip">
         <AppIcon name="shield" size={20} />
         <div>
-          <strong>Seus dados permanecem protegidos</strong>
-          <span>As credenciais da Pluggy ficam nas Edge Functions, não no navegador.</span>
+          <strong>Importação com privacidade</strong>
+          <span>
+            O extrato é interpretado localmente. Somente as movimentações
+            confirmadas são gravadas na sua conta.
+          </span>
         </div>
       </section>
     </div>

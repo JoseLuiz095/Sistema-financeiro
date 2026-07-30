@@ -294,13 +294,17 @@ export async function renameOpenFinanceConnection(connection, displayName) {
   return data
 }
 
-export async function createPluggyConnectToken({ itemId } = {}) {
+export async function createPluggyConnectSession({
+  itemId,
+  flow = 'BANKS',
+} = {}) {
   const { data, error } =
     await supabase.functions.invoke(
       'pluggy-connect',
       {
         body: {
           action: 'create-token',
+          flow,
           ...(itemId ? { itemId } : {}),
         },
       },
@@ -315,15 +319,33 @@ export async function createPluggyConnectToken({ itemId } = {}) {
   if (!data?.success || !data?.accessToken) {
     throw new Error(
       data?.error ??
-        'Não foi possível criar o Connect Token.',
+        'Não foi possível preparar a conexão segura.',
     )
   }
 
-  return data.accessToken
+  const selectedConnectorId = Number(
+    data?.selectedConnectorId,
+  )
+
+  const connectorIds = Array.isArray(data?.connectorIds)
+    ? data.connectorIds
+        .map((value) => Number(value))
+        .filter((value) => Number.isFinite(value))
+    : []
+
+  return {
+    accessToken: data.accessToken,
+    flow: data?.flow ?? flow,
+    selectedConnectorId: Number.isFinite(selectedConnectorId)
+      ? selectedConnectorId
+      : null,
+    connectorIds,
+  }
 }
 
 export async function registerPluggyItem(
   itemId,
+  { flow = 'BANKS' } = {},
 ) {
   const { data, error } =
     await supabase.functions.invoke(
@@ -332,6 +354,7 @@ export async function registerPluggyItem(
         body: {
           action: 'register-item',
           itemId,
+          flow,
         },
       },
     )

@@ -25,6 +25,26 @@ function formatDateTime(value) {
   return new Date(value).toLocaleString('pt-BR')
 }
 
+function normalizeInstitutionName(value) {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]/g, '')
+    .toUpperCase()
+}
+
+function isMeuPluggyConnection(connection) {
+  const values = [
+    connection?.institution_name,
+    connection?.metadata?.connector_name,
+    connection?.metadata?.display_name,
+  ]
+
+  return values.some(
+    (value) => normalizeInstitutionName(value) === 'MEUPLUGGY',
+  )
+}
+
 function getStatusLabel(status) {
   const labels = {
     NEVER: 'Nunca sincronizada',
@@ -114,6 +134,11 @@ export default function OpenFinancePage({ user, setFeedback, onChanged }) {
       0,
     ),
     [investmentPositions],
+  )
+
+  const meuPluggyConnection = useMemo(
+    () => connections.find(isMeuPluggyConnection) ?? null,
+    [connections],
   )
 
   async function handleSync(connection) {
@@ -262,20 +287,77 @@ export default function OpenFinancePage({ user, setFeedback, onChanged }) {
           Você não precisa criar credenciais da API Pluggy para cada usuário. O sistema usa uma aplicação Pluggy central, mas identifica cada conexão pelo usuário do Supabase e aplica isolamento por RLS.
         </div>
 
-        <div className="inline-actions open-finance-primary-actions">
-          <ConnectBankButton
-            setFeedback={setFeedback}
-            onConnected={async (savedConnection, context) => {
-              if (context?.shouldSync) {
-                await handleSync(savedConnection)
-                return
-              }
+        <div className="open-finance-connect-options">
+          <article className="open-finance-connect-option">
+            <span className="open-finance-connect-option-kicker">
+              {meuPluggyConnection
+                ? 'Conexão encontrada'
+                : 'Já possui MeuPluggy?'}
+            </span>
+            <h3>
+              {meuPluggyConnection
+                ? 'MeuPluggy já vinculado'
+                : 'Usar minha conta MeuPluggy'}
+            </h3>
+            <p>
+              {meuPluggyConnection
+                ? 'O sistema encontrou uma conexão MeuPluggy vinculada a este usuário. Use a atualização para renovar o acesso.'
+                : 'Entre com uma conta MeuPluggy existente. O sistema não recebe nem armazena sua senha.'}
+            </p>
+            <div className="open-finance-connect-option-action">
+              <ConnectBankButton
+                connection={meuPluggyConnection}
+                flow="MEU_PLUGGY"
+                label={
+                  meuPluggyConnection
+                    ? 'Atualizar MeuPluggy'
+                    : 'Entrar com MeuPluggy'
+                }
+                setFeedback={setFeedback}
+                onConnected={async (savedConnection, context) => {
+                  if (context?.shouldSync) {
+                    await handleSync(savedConnection)
+                    return
+                  }
 
-              await loadData()
-              if (onChanged) await onChanged()
-            }}
-          />
+                  await loadData()
+                  if (onChanged) await onChanged()
+                }}
+              />
+            </div>
+          </article>
+
+          <article className="open-finance-connect-option open-finance-connect-option-secondary">
+            <span className="open-finance-connect-option-kicker">
+              Não usa MeuPluggy?
+            </span>
+            <h3>Conectar bancos diretamente</h3>
+            <p>
+              Escolha Inter, Sicoob, PicPay, Nubank ou outra instituição disponível e faça a autorização no fluxo oficial.
+            </p>
+            <div className="open-finance-connect-option-action">
+              <ConnectBankButton
+                flow="BANKS"
+                label="Escolher meus bancos"
+                className="secondary-button"
+                setFeedback={setFeedback}
+                onConnected={async (savedConnection, context) => {
+                  if (context?.shouldSync) {
+                    await handleSync(savedConnection)
+                    return
+                  }
+
+                  await loadData()
+                  if (onChanged) await onChanged()
+                }}
+              />
+            </div>
+          </article>
         </div>
+
+        <p className="open-finance-connect-note">
+          A verificação considera as conexões já registradas neste sistema. Por segurança, não é possível consultar ou criar automaticamente uma conta global do MeuPluggy pelo e-mail do usuário.
+        </p>
 
         <div className="open-finance-toolbar">
           <label>

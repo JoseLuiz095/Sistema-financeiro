@@ -9,6 +9,9 @@ import {
 import {
   getInvestmentBalance,
 } from '../utils/openFinance'
+import {
+  hasPremiumDataAccess,
+} from '../utils/openFinanceAccess'
 
 
 const SUMMARY_ITEMS = [
@@ -39,12 +42,18 @@ const SUMMARY_ITEMS = [
 ]
 
 export default function HomePage({
+  user,
   accounts,
   transactions,
   importedInvestmentPositions = [],
   openFinanceConnections = [],
   onNavigate,
 }) {
+  const premiumAccess = hasPremiumDataAccess(user)
+  const visibleSummaryItems = premiumAccess
+    ? SUMMARY_ITEMS
+    : SUMMARY_ITEMS.filter((item) => item.key !== 'sources')
+
   const currentMonth = new Date()
     .toISOString()
     .slice(0, 7)
@@ -127,8 +136,9 @@ export default function HomePage({
         importedInvestments,
       ),
       tone: '',
-      helper:
-        'Posições informadas pelo Open Finance.',
+      helper: premiumAccess
+        ? 'Posições informadas pelo Open Finance.'
+        : 'Posições e movimentações de investimentos.',
     },
     sources: {
       value: String(activeConnections),
@@ -150,17 +160,13 @@ export default function HomePage({
             Atualização segura e integrada
           </div>
 
-          <span className="eyebrow">
-            Visão rápida
-          </span>
           <h2>
             Seu financeiro organizado em um só lugar
           </h2>
           <p>
-            Importe extratos, conecte instituições e
-            acompanhe gastos, investimentos e compromissos
-            futuros com uma leitura simples no celular ou
-            computador.
+            {premiumAccess
+              ? 'Importe extratos, conecte instituições e acompanhe gastos, investimentos e compromissos futuros com uma leitura simples no celular ou computador.'
+              : 'Importe extratos e acompanhe gastos, investimentos e compromissos futuros com uma leitura simples no celular ou computador.'}
           </p>
         </div>
 
@@ -179,22 +185,24 @@ export default function HomePage({
             Importar extrato
           </button>
 
-          <button
-            type="button"
-            className="secondary-button action-button-with-icon"
-            onClick={() =>
-              onNavigate(
-                'data',
-                'openfinance',
-              )
-            }
-          >
-            <AppIcon
-              name="bank"
-              size={18}
-            />
-            Open Finance
-          </button>
+          {premiumAccess && (
+            <button
+              type="button"
+              className="secondary-button action-button-with-icon"
+              onClick={() =>
+                onNavigate(
+                  'data',
+                  'openfinance',
+                )
+              }
+            >
+              <AppIcon
+                name="bank"
+                size={18}
+              />
+              Open Finance
+            </button>
+          )}
 
           <button
             type="button"
@@ -228,8 +236,13 @@ export default function HomePage({
         </div>
       </section>
 
-      <section className="summary-grid summary-grid-4 home-summary-grid">
-        {SUMMARY_ITEMS.map((item) => {
+      <section
+        className={
+          `summary-grid summary-grid-4 home-summary-grid ` +
+          (premiumAccess ? '' : 'home-summary-grid-basic')
+        }
+      >
+        {visibleSummaryItems.map((item) => {
           const metric =
             summaryValues[item.key]
 
@@ -298,8 +311,9 @@ export default function HomePage({
                   Nenhuma movimentação disponível
                 </strong>
                 <span>
-                  Importe um extrato ou conecte uma
-                  instituição para começar.
+                  {premiumAccess
+                    ? 'Importe um extrato ou conecte uma instituição para começar.'
+                    : 'Importe um extrato para começar.'}
                 </span>
               </div>
             ) : (
@@ -371,10 +385,12 @@ export default function HomePage({
               <span>Contas identificadas</span>
               <strong>{accounts.length}</strong>
             </div>
-            <div>
-              <span>Conexões Open Finance</span>
-              <strong>{activeConnections}</strong>
-            </div>
+            {premiumAccess && (
+              <div>
+                <span>Conexões Open Finance</span>
+                <strong>{activeConnections}</strong>
+              </div>
+            )}
             <div>
               <span>Movimentações carregadas</span>
               <strong>{transactions.length}</strong>

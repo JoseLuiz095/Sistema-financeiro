@@ -235,6 +235,10 @@ td small {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.home-summary-grid-basic {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .summary-card {
   padding: 18px;
 }
@@ -2044,6 +2048,69 @@ body {
   margin-top: 18px;
 }
 
+.open-finance-connect-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.open-finance-connect-option {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px;
+  border: 1px solid #cfe0f2;
+  border-radius: 16px;
+  background: linear-gradient(145deg, #f8fbff, #eef5fc);
+}
+
+.open-finance-connect-option-secondary {
+  border-color: #dde5ee;
+  background: #fbfcfe;
+}
+
+.open-finance-connect-option-kicker {
+  color: #1557a0;
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.open-finance-connect-option h3 {
+  margin: 0;
+  color: #26384f;
+  font-size: 17px;
+}
+
+.open-finance-connect-option p {
+  min-height: 66px;
+  margin: 0;
+  color: #5f7085;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.open-finance-connect-option-action {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: auto;
+}
+
+.open-finance-connect-option-action > button {
+  width: 100%;
+}
+
+.open-finance-connect-note {
+  margin: 12px 0 0;
+  color: #69778b;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
 .connect-bank-inline-status {
   align-self: center;
   color: #52647a;
@@ -2064,8 +2131,34 @@ body {
     min-width: 0;
   }
 
-  .open-finance-onboarding-grid {
+  .open-finance-onboarding-grid,
+  .open-finance-connect-options {
     grid-template-columns: 1fr;
+  }
+
+  .open-finance-connect-option p {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 520px) {
+  .open-finance-connect-option {
+    padding: 15px;
+    border-radius: 14px;
+  }
+
+  .open-finance-connect-option h3 {
+    font-size: 16px;
+  }
+
+  .open-finance-connect-option-action {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .open-finance-connect-option-action > button,
+  .connection-card-actions > button {
+    width: 100%;
   }
 }
 
@@ -2272,4 +2365,145 @@ body {
   .mfa-challenge-card h1 {
     font-size: 22px;
   }
+}
+
+/* Etapa V10 - acesso controlado e importação segura */
+.workspace-choice-grid-single {
+  grid-template-columns: minmax(0, 760px);
+  justify-content: start;
+}
+
+.import-method-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.75fr);
+  gap: 16px;
+}
+
+.import-drop-zone {
+  min-height: 220px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  padding: 28px;
+  border: 2px dashed #9eb9d8;
+  border-radius: 18px;
+  color: #234b78;
+  background: linear-gradient(145deg, #f7fbff, #eef6ff);
+  text-align: center;
+  transition: border-color 160ms ease, transform 160ms ease, background 160ms ease;
+}
+
+.import-drop-zone:hover,
+.import-drop-zone.is-dragging {
+  border-color: #1456a0;
+  background: #eaf4ff;
+  transform: translateY(-2px);
+}
+
+.import-drop-zone strong {
+  font-size: 18px;
+}
+
+.import-drop-zone span,
+.import-drop-zone small {
+  color: #617189;
+}
+
+.import-drop-icon {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 15px;
+  color: #ffffff !important;
+  background: #1456a0;
+  font-size: 25px;
+  font-weight: 800;
+}
+
+.visually-hidden-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.import-help-card {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding: 20px;
+  border: 1px solid #dce6f2;
+  border-radius: 16px;
+  background: #ffffff;
+}
+
+.import-help-card ol {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 20px;
+  color: #536176;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.import-security-note {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 13px 15px;
+  border: 1px solid #cfe2d6;
+  border-radius: 12px;
+  color: #24543a;
+  background: #f1faf4;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.import-controls-simple {
+  grid-template-columns: minmax(260px, 1fr) minmax(300px, 1.4fr);
+}
+
+.import-quick-account-form {
+  padding: 16px;
+  border: 1px solid #dce6f2;
+  border-radius: 14px;
+  background: #f8fbfe;
+}
+
+.import-mobile-list {
+  display: none;
+}
+
+.import-mobile-card {
+  display: grid;
+  gap: 12px;
+  padding: 15px;
+  border: 1px solid #dce6f2;
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.import-mobile-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.import-mobile-card p {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.import-mobile-date {
+  color: #69778b;
+  font-size: 12px;
 }

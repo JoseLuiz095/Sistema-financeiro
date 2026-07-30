@@ -3,11 +3,12 @@ import {
   useState,
 } from 'react'
 import AppIcon from '../components/AppIcon'
+import { hasPremiumDataAccess } from '../utils/openFinanceAccess'
 import CategoriesPage from './CategoriesPage'
 import IntegrationsPage from './IntegrationsPage'
 import SecurityPage from './SecurityPage'
 
-const OPTIONS = [
+const BASE_OPTIONS = [
   {
     value: 'categories',
     title: 'Categorias',
@@ -22,14 +23,15 @@ const OPTIONS = [
       'Gerencie autenticador, senha e sessões abertas.',
     icon: 'shield',
   },
-  {
-    value: 'integrations',
-    title: 'Integrações avançadas',
-    description:
-      'Acompanhe conexões técnicas, APIs e sincronizações.',
-    icon: 'integrations',
-  },
 ]
+
+const PREMIUM_OPTION = {
+  value: 'integrations',
+  title: 'Integrações avançadas',
+  description:
+    'Acompanhe conexões técnicas, APIs e sincronizações.',
+  icon: 'integrations',
+}
 
 export default function MorePage({
   requestedSection,
@@ -41,15 +43,26 @@ export default function MorePage({
   onChanged,
   setFeedback,
 }) {
-  const [section, setSection] = useState(
-    requestedSection || 'menu',
-  )
+  const premiumAccess = hasPremiumDataAccess(user)
+  const options = premiumAccess
+    ? [...BASE_OPTIONS, PREMIUM_OPTION]
+    : BASE_OPTIONS
+  const initialSection =
+    requestedSection === 'integrations' && !premiumAccess
+      ? 'menu'
+      : requestedSection || 'menu'
+  const [section, setSection] = useState(initialSection)
 
   useEffect(() => {
-    if (requestedSection) {
-      setSection(requestedSection)
+    if (!requestedSection) return
+
+    if (requestedSection === 'integrations' && !premiumAccess) {
+      setSection('menu')
+      return
     }
-  }, [requestedSection])
+
+    setSection(requestedSection)
+  }, [premiumAccess, requestedSection])
 
   if (section === 'menu') {
     return (
@@ -78,7 +91,7 @@ export default function MorePage({
         </section>
 
         <section className="secondary-option-grid">
-          {OPTIONS.map(
+          {options.map(
             ({
               value,
               title,
@@ -147,7 +160,7 @@ export default function MorePage({
         />
       )}
 
-      {section === 'integrations' && (
+      {section === 'integrations' && premiumAccess && (
         <IntegrationsPage
           user={user}
           accounts={accounts}

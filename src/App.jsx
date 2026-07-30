@@ -1230,6 +1230,7 @@ export default function App() {
         >
         {activePage === 'home' && (
           <HomePage
+            user={user}
             accounts={accounts}
             transactions={transactions}
             investmentResult={
