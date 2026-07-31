@@ -1537,3 +1537,88 @@
     width: 100%;
   }
 }
+
+.asset-imported-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid #cad9e9;
+  border-radius: 12px;
+  background: #f8fbff;
+}
+
+.asset-imported-summary > div {
+  display: grid;
+  gap: 4px;
+}
+
+.asset-imported-summary strong {
+  color: #163b61;
+}
+
+.asset-imported-summary span {
+  color: #61768c;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+@media (max-width: 720px) {
+  .asset-imported-summary {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .asset-imported-summary .secondary-button {
+    width: 100%;
+  }
+}
+
+/* =========================================================
+   ETAPA V10.7 - ANALISE DE ATIVOS MOBILE EM RETRATO
+   ========================================================= */
+@media (max-width: 760px) {
+  .asset-chart-shell {
+    margin-top: 12px;
+    border-radius: 13px;
+    overflow: visible;
+  }
+
+  .asset-price-chart {
+    width: 100%;
+    max-width: 100%;
+    padding: 10px 2px 4px;
+  }
+
+  .asset-chart-tooltip {
+    min-width: 0;
+    max-width: min(76vw, 280px);
+    padding: 10px;
+  }
+
+  .asset-panel-header-actions,
+  .asset-history-controls {
+    width: 100%;
+  }
+
+  .asset-history-controls {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) and (orientation: portrait) {
+  .asset-price-chart.mobile-portrait-chart {
+    height: clamp(440px, 122vw, 570px) !important;
+    min-height: 440px !important;
+    max-height: 570px;
+  }
+}
+
+@media (max-width: 760px) and (orientation: landscape) {
+  .asset-price-chart.mobile-portrait-chart {
+    height: 330px !important;
+    min-height: 310px !important;
+  }
+}

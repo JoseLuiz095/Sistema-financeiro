@@ -71,7 +71,7 @@ export default function SimulationChart({
         </small>
       </div>
 
-      <div className="calculator-chart personal-private-chart">
+      <div className="calculator-chart mobile-portrait-chart personal-private-chart">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart
             data={data}

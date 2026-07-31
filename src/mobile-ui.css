@@ -1985,3 +1985,361 @@ textarea,
     text-align: center;
   }
 }
+
+/* =========================================================
+   ETAPA V10.7 - ACABAMENTO MOBILE E GRAFICOS EM RETRATO
+   ========================================================= */
+.mobile-chart-legend {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .page-stack,
+  .dashboard-visual-grid,
+  .investment-visual-grid,
+  .content-grid,
+  .home-grid {
+    gap: 14px;
+  }
+
+  .chart-panel,
+  .interactive-chart-panel,
+  .chart-container,
+  .mobile-portrait-chart {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .chart-panel-header,
+  .chart-panel .panel-header {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .chart-range-controls {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: none;
+  }
+
+  .chart-range-controls::-webkit-scrollbar {
+    display: none;
+  }
+
+  .chart-range-controls button {
+    flex: 1 0 auto;
+    min-width: 62px;
+    min-height: 42px;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 760px) {
+  html,
+  body,
+  #root {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  body {
+    font-size: 15px;
+  }
+
+  .app-page {
+    padding-right: 10px;
+    padding-left: 10px;
+  }
+
+  .app-content,
+  .page-stack,
+  .page-stack > *,
+  .panel,
+  .panel-heading-surface,
+  .section-intro-card,
+  .analytics-heading,
+  .analytics-title-wrap,
+  .responsive-data-panel,
+  .workspace-choice,
+  .secondary-option {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .page-stack {
+    gap: 12px;
+  }
+
+  .panel,
+  .panel-heading-surface,
+  .section-intro-card {
+    padding: 16px 14px;
+    border-radius: 16px;
+  }
+
+  .panel-header,
+  .section-intro,
+  .analytics-title-wrap,
+  .investment-insights-hero,
+  .asset-panel-header-actions {
+    min-width: 0;
+  }
+
+  .panel-header h2,
+  .section-intro h2,
+  .analytics-title-wrap h2,
+  .investment-insights-hero h2 {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    font-size: clamp(1.18rem, 5.7vw, 1.55rem);
+    line-height: 1.2;
+  }
+
+  .panel-header p,
+  .section-intro p,
+  .analytics-title-wrap p,
+  .investment-insights-hero p,
+  .info-callout,
+  .auth-security-note {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    font-size: 0.88rem;
+    line-height: 1.55;
+  }
+
+  .summary-grid,
+  .summary-grid-4,
+  .investment-summary-grid,
+  .import-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+  }
+
+  .summary-card,
+  .metric-card {
+    min-width: 0;
+    padding: 13px 12px;
+    border-radius: 13px;
+  }
+
+  .summary-card span,
+  .metric-card span {
+    overflow-wrap: anywhere;
+    font-size: 0.74rem;
+    line-height: 1.35;
+  }
+
+  .summary-card strong,
+  .metric-card strong {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    font-size: clamp(1.12rem, 5.6vw, 1.5rem);
+    line-height: 1.18;
+  }
+
+  .inline-actions,
+  .panel-actions,
+  .import-step-actions,
+  .import-success-actions {
+    width: 100%;
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .inline-actions > button,
+  .panel-actions > button,
+  .import-step-actions > button,
+  .import-success-actions > button {
+    width: 100%;
+    min-height: 48px;
+  }
+
+  input,
+  select,
+  textarea,
+  .search-input {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    min-height: 48px;
+    font-size: 16px;
+  }
+
+  .chart-panel {
+    overflow: visible;
+  }
+
+  .chart-panel .panel-header {
+    margin-bottom: 8px;
+  }
+
+  .chart-container,
+  .dashboard-chart-container,
+  .dashboard-chart-large,
+  .investment-flow-chart,
+  .investment-allocation-chart {
+    width: 100%;
+    max-width: 100%;
+    overflow: visible;
+  }
+
+  .mobile-chart-legend {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .mobile-chart-legend span {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: 10px minmax(0, 1fr);
+    align-items: center;
+    gap: 3px 7px;
+    padding: 9px 10px;
+    border: 1px solid var(--ui-border);
+    border-radius: 11px;
+    background: var(--ui-soft);
+  }
+
+  .mobile-chart-legend i {
+    width: 10px;
+    height: 10px;
+    grid-row: 1 / span 2;
+    border-radius: 999px;
+  }
+
+  .mobile-chart-legend strong,
+  .mobile-chart-legend em {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-chart-legend strong {
+    color: var(--ui-text);
+    font-size: 0.76rem;
+  }
+
+  .mobile-chart-legend em {
+    color: var(--ui-muted);
+    font-size: 0.7rem;
+    font-style: normal;
+  }
+
+  .chart-selection-summary {
+    grid-template-columns: 1fr;
+    gap: 5px;
+    padding: 12px;
+  }
+
+  .chart-selection-summary strong,
+  .chart-selection-summary em {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .recharts-default-tooltip,
+  .asset-chart-tooltip {
+    max-width: min(76vw, 280px) !important;
+    font-size: 12px !important;
+  }
+
+  .recharts-wrapper,
+  .recharts-surface {
+    max-width: 100% !important;
+  }
+
+  .table-wrapper {
+    border-radius: 13px;
+  }
+
+  .mobile-data-card {
+    padding: 13px;
+    border-radius: 13px;
+  }
+
+  .analytics-nav {
+    display: flex;
+    width: 100%;
+    max-width: 100%;
+    gap: 6px;
+    padding: 4px;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: none;
+  }
+
+  .analytics-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .analytics-nav button {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 132px;
+    min-height: 44px;
+    padding: 8px 12px;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 760px) and (orientation: portrait) {
+  .mobile-portrait-chart,
+  .chart-container.mobile-portrait-chart,
+  .dashboard-chart-container.mobile-portrait-chart {
+    height: clamp(400px, 112vw, 520px) !important;
+    min-height: 400px !important;
+    max-height: 520px;
+  }
+
+  .dashboard-chart-large.mobile-portrait-chart,
+  .investment-flow-chart.mobile-portrait-chart {
+    height: clamp(430px, 120vw, 560px) !important;
+    min-height: 430px !important;
+    max-height: 560px;
+  }
+
+  .investment-allocation-chart.mobile-portrait-chart {
+    height: clamp(500px, 138vw, 620px) !important;
+    min-height: 500px !important;
+    max-height: 620px;
+  }
+}
+
+@media (max-width: 390px) {
+  .summary-grid,
+  .summary-grid-4,
+  .investment-summary-grid,
+  .import-summary-grid,
+  .mobile-chart-legend {
+    grid-template-columns: 1fr;
+  }
+
+  .panel,
+  .panel-heading-surface,
+  .section-intro-card {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .analytics-nav button {
+    min-width: 120px;
+  }
+}
+
+@media (max-width: 760px) and (orientation: landscape) {
+  .mobile-portrait-chart,
+  .chart-container.mobile-portrait-chart,
+  .dashboard-chart-container.mobile-portrait-chart {
+    height: 320px !important;
+    min-height: 300px !important;
+  }
+}

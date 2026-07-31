@@ -200,7 +200,7 @@ export default function InvestmentInsightsPage({
               </div>
             </div>
 
-            <div className="chart-container investment-flow-chart personal-private-chart">
+            <div className="chart-container investment-flow-chart mobile-portrait-chart personal-private-chart">
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart
                   data={monthlyView}
@@ -255,7 +255,7 @@ export default function InvestmentInsightsPage({
                   Não foi possível identificar o ativo das movimentações.
                 </div>
               ) : (
-                <div className="chart-container investment-allocation-chart personal-private-chart">
+                <div className="chart-container investment-allocation-chart mobile-portrait-chart personal-private-chart">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                       data={topAssets}

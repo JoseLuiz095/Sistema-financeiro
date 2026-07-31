@@ -381,7 +381,7 @@ export default function DashboardPage({
               </div>
             </div>
 
-            <div className="chart-container dashboard-chart-container dashboard-chart-large personal-private-chart">
+            <div className="chart-container dashboard-chart-container dashboard-chart-large mobile-portrait-chart personal-private-chart">
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart
                   data={monthlyView}
@@ -452,7 +452,7 @@ export default function DashboardPage({
               <p>Toque ou passe o cursor sobre as barras para destacar um grupo.</p>
             </div>
 
-            <div className="chart-container dashboard-chart-container personal-private-chart">
+            <div className="chart-container dashboard-chart-container mobile-portrait-chart personal-private-chart">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={categoryView}
@@ -518,7 +518,7 @@ export default function DashboardPage({
               </div>
             ) : (
               <>
-                <div className="chart-container dashboard-chart-container personal-private-chart">
+                <div className="chart-container dashboard-chart-container mobile-portrait-chart personal-private-chart">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie

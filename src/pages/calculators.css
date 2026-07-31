@@ -214,7 +214,7 @@
 
 .calculator-form-panel {
   position: sticky;
-  top: 140px;
+  top: 92px;
 }
 
 .calculator-form-grid {
@@ -942,5 +942,112 @@
 
   .calculator-duration-control {
     grid-template-columns: 1fr;
+  }
+}
+
+/* =========================================================
+   ETAPA V10.7 - CALCULADORAS MOBILE EM RETRATO
+   ========================================================= */
+@media (max-width: 760px) {
+  .calculators-page {
+    gap: 12px;
+  }
+
+  .calculators-hero,
+  .calculator-library-panel,
+  .calculator-form-panel,
+  .calculator-results-panel {
+    padding: 16px 14px;
+    border-radius: 16px;
+  }
+
+  .calculator-card-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .calculator-card {
+    min-height: 74px;
+    grid-template-columns: 42px minmax(0, 1fr) 20px;
+    gap: 11px;
+    padding: 14px 12px;
+  }
+
+  .calculator-card-copy > span:nth-child(2) {
+    display: block;
+    overflow: visible;
+    font-size: 12px;
+    line-height: 1.45;
+    -webkit-line-clamp: initial;
+  }
+
+  .calculator-form-grid,
+  .calculator-results-grid {
+    grid-template-columns: 1fr;
+    gap: 11px;
+  }
+
+  .calculator-result-metric {
+    min-height: 82px;
+    padding: 14px;
+  }
+
+  .calculator-chart-block {
+    margin-top: 18px;
+    padding-top: 16px;
+  }
+
+  .calculator-chart-heading {
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+
+  .calculator-chart-heading small {
+    max-width: 100%;
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .calculator-chart-mobile-legend {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .calculator-chart-mobile-legend span {
+    min-width: 0;
+    padding: 9px 10px;
+    border: 1px solid #dce4ee;
+    border-radius: 11px;
+    background: #f8fafc;
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (max-width: 760px) and (orientation: portrait) {
+  .calculator-chart.mobile-portrait-chart {
+    width: 100%;
+    height: clamp(420px, 118vw, 550px) !important;
+    min-height: 420px;
+    max-height: 550px;
+    margin: 0;
+  }
+}
+
+@media (max-width: 390px) {
+  .calculator-chart-mobile-legend {
+    grid-template-columns: 1fr;
+  }
+
+  .calculator-duration-control {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) and (orientation: landscape) {
+  .calculator-chart.mobile-portrait-chart {
+    height: 320px !important;
+    min-height: 300px;
   }
 }

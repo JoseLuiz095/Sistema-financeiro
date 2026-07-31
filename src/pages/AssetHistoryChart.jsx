@@ -53,7 +53,7 @@ function CustomTooltip({ active, payload, label }) {
 export default function AssetHistoryChart({ series }) {
   return (
     <div className="asset-chart-shell">
-      <div className="asset-price-chart">
+      <div className="asset-price-chart mobile-portrait-chart">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart
             data={series}
